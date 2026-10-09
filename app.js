@@ -1,1492 +1,502 @@
-/* ==========================================================
-   KOMSI MUSIC LIBRARY — FULL V2
-   Local prototype / ready for Supabase integration later.
-========================================================== */
-
-const DB_NAME = "komsi_music_library_v2";
-const DB_VERSION = 1;
-const STORE = "songs";
-
-const state = {
-  songs: [],
-  filtered: [],
-  currentIndex: -1,
-  currentSong: null,
-  search: "",
-  genre: "all",
-  sort: "newest",
-  playing: false,
-  volume: 0.8,
-  muted: false
-};
-
-let db;
-let audio = new Audio();
-audio.preload = "metadata";
-
-/* ==========================================================
-   HELPER
-========================================================== */
-
-const $ = (selector) => document.querySelector(selector);
-const $$ = (selector) => [...document.querySelectorAll(selector)];
-
-function escapeHTML(value) {
-  return String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
-
-function formatTime(seconds) {
-  if (!Number.isFinite(seconds)) return "0:00";
-
-  const minutes = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
-
-  return `${minutes}:${String(secs).padStart(2, "0")}`;
-}
-
-function generateId() {
-  return `${Date.now().toString(36)}-${Math.random()
-    .toString(36)
-    .slice(2, 9)}`;
-}
-
-/* ==========================================================
-   INDEXED DB
-========================================================== */
-
-function openDB() {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-
-    request.onupgradeneeded = (event) => {
-      const database = event.target.result;
-
-      if (!database.objectStoreNames.contains(STORE)) {
-        const store = database.createObjectStore(STORE, {
-          keyPath: "id"
-        });
-
-        store.createIndex("title", "title");
-        store.createIndex("genre", "genre");
-        store.createIndex("createdAt", "createdAt");
-      }
-    };
-
-    request.onsuccess = () => {
-      db = request.result;
-      resolve(db);
-    };
-
-    request.onerror = () => {
-      reject(request.error);
-    };
-  });
-}
-
-function getSongs() {
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(STORE, "readonly");
-    const store = transaction.objectStore(STORE);
-    const request = store.getAll();
-
-    request.onsuccess = () => {
-      resolve(request.result || []);
-    };
-
-    request.onerror = () => {
-      reject(request.error);
-    };
-  });
-}
-
-function putSong(song) {
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(STORE, "readwrite");
-    const store = transaction.objectStore(STORE);
-    const request = store.put(song);
-
-    request.onsuccess = () => {
-      resolve(song);
-    };
-
-    request.onerror = () => {
-      reject(request.error);
-    };
-  });
-}
-
-function removeSong(songId) {
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(STORE, "readwrite");
-    const store = transaction.objectStore(STORE);
-    const request = store.delete(songId);
-
-    request.onsuccess = () => {
-      resolve();
-    };
-
-    request.onerror = () => {
-      reject(request.error);
-    };
-  });
-}
-
-/* ==========================================================
-   INITIALIZATION
-========================================================== */
-
-document.addEventListener("DOMContentLoaded", async () => {
-  try {
-    await openDB();
-
-    state.songs = await getSongs();
-
-    bindUI();
-    applyFilters();
-    updatePlayer();
-
-  } catch (error) {
-    console.error(error);
-
-    toast(
-      "Gagal membuka penyimpanan browser.",
-      "error"
-    );
-  }
-});
-
-/* ==========================================================
-   BIND UI
-========================================================== */
-
-function bindUI() {
-
-  /* SEARCH */
-
-  $("#searchInput")?.addEventListener("input", (event) => {
-    state.search = event.target.value;
-
-    applyFilters();
-  });
-
-
-  /* GENRE */
-
-  $("#genreFilter")?.addEventListener("change", (event) => {
-
-    state.genre = event.target.value;
-
-    syncGenreChips();
-
-    applyFilters();
-  });
-
-
-  /* SORT */
-
-  $("#sortSelect")?.addEventListener("change", (event) => {
-
-    state.sort = event.target.value;
-
-    applyFilters();
-  });
-
-
-  /* QUICK FILTER */
-
-  $$(".chip").forEach((chip) => {
-
-    chip.addEventListener("click", () => {
-
-      state.genre = chip.dataset.genre;
-
-      $("#genreFilter").value = state.genre;
-
-      syncGenreChips();
-
-      applyFilters();
-    });
-
-  });
-
-
-  /* OPEN MODAL */
-
-  $("#addSongBtn")?.addEventListener(
-    "click",
-    openModal
-  );
-
-  $("#emptyUploadBtn")?.addEventListener(
-    "click",
-    openModal
-  );
-
-  $("#heroAdminBtn")?.addEventListener(
-    "click",
-    openModal
-  );
-
-  $("#mobileAdminBtn")?.addEventListener(
-    "click",
-    openModal
-  );
-
-
-  /* CLOSE MODAL */
-
-  $("#closeModal")?.addEventListener(
-    "click",
-    closeModal
-  );
-
-  $("#cancelUpload")?.addEventListener(
-    "click",
-    closeModal
-  );
-
-
-  /* CLICK OUTSIDE MODAL */
-
-  $("#uploadModal")?.addEventListener(
-    "click",
-    (event) => {
-
-      if (event.target === $("#uploadModal")) {
-        closeModal();
-      }
-
-    }
-  );
-
-
-  /* FORM */
-
-  $("#uploadForm")?.addEventListener(
-    "submit",
-    uploadSong
-  );
-
-
-  /* AUDIO FILE */
-
-  $("#uploadForm input[name='audio']")
-    ?.addEventListener("change", (event) => {
-
-      const file = event.target.files[0];
-
-      $("#audioFileName").textContent =
-        file?.name || "Belum dipilih";
-
-    });
-
-
-  /* COVER FILE */
-
-  $("#uploadForm input[name='cover']")
-    ?.addEventListener("change", (event) => {
-
-      const file = event.target.files[0];
-
-      $("#coverFileName").textContent =
-        file?.name || "Opsional";
-
-    });
-
-
-  /* PLAYER */
-
-  $("#playBtn")?.addEventListener(
-    "click",
-    togglePlay
-  );
-
-  $("#prevBtn")?.addEventListener(
-    "click",
-    previous
-  );
-
-  $("#nextBtn")?.addEventListener(
-    "click",
-    next
-  );
-
-  $("#muteBtn")?.addEventListener(
-    "click",
-    toggleMute
-  );
-
-
-  /* VOLUME */
-
-  $("#volumeControl")?.addEventListener(
-    "input",
-    (event) => {
-
-      state.volume = Number(event.target.value);
-
-      state.muted = state.volume === 0;
-
-      audio.volume =
-        state.muted
-          ? 0
-          : state.volume;
-
-      updatePlayer();
-    }
-  );
-
-
-  /* PROGRESS */
-
-  $("#progressBar")?.addEventListener(
-    "input",
-    (event) => {
-
-      if (
-        Number.isFinite(audio.duration) &&
-        audio.duration > 0
-      ) {
-
-        audio.currentTime =
-          (Number(event.target.value) / 100) *
-          audio.duration;
-
-      }
-
-    }
-  );
-
-
-  /* MOBILE MENU */
-
-  $("#menuToggle")?.addEventListener(
-    "click",
-    () => {
-
-      const menu = $("#mobileMenu");
-
-      const open =
-        menu.classList.toggle("open");
-
-      $("#menuToggle").setAttribute(
-        "aria-expanded",
-        String(open)
-      );
-
-    }
-  );
-
-
-  $$("#mobileMenu a").forEach((link) => {
-
-    link.addEventListener("click", () => {
-
-      $("#mobileMenu").classList.remove(
-        "open"
-      );
-
-      $("#menuToggle").setAttribute(
-        "aria-expanded",
-        "false"
-      );
-
-    });
-
-  });
-
-
-  /* KEYBOARD */
-
-  document.addEventListener(
-    "keydown",
-    keyboard
-  );
-
-
-  /* AUDIO EVENTS */
-
-  audio.addEventListener(
-    "timeupdate",
-    updateProgress
-  );
-
-  audio.addEventListener(
-    "loadedmetadata",
-    updatePlayer
-  );
-
-  audio.addEventListener(
-    "play",
-    () => {
-
-      state.playing = true;
-
-      updatePlayer();
-
-    }
-  );
-
-  audio.addEventListener(
-    "pause",
-    () => {
-
-      state.playing = false;
-
-      updatePlayer();
-
-    }
-  );
-
-  audio.addEventListener(
-    "ended",
-    next
-  );
-}
-
-/* ==========================================================
-   FILTER & SORT
-========================================================== */
-
-function applyFilters() {
-
-  const query =
-    state.search.trim().toLowerCase();
-
-  let list = [...state.songs];
-
-
-  /* SEARCH */
-
-  if (query) {
-
-    list = list.filter((song) => {
-
-      const title =
-        String(song.title || "")
-          .toLowerCase();
-
-      const artist =
-        String(song.artist || "")
-          .toLowerCase();
-
-      const album =
-        String(song.album || "")
-          .toLowerCase();
-
-      return (
-        title.includes(query) ||
-        artist.includes(query) ||
-        album.includes(query)
-      );
-
-    });
-
-  }
-
-
-  /* GENRE */
-
-  if (state.genre !== "all") {
-
-    list = list.filter(
-      (song) =>
-        song.genre === state.genre
-    );
-
-  }
-
-
-  /* SORT */
-
-  if (state.sort === "newest") {
-
-    list.sort(
-      (a, b) =>
-        (b.createdAt || 0) -
-        (a.createdAt || 0)
-    );
-
-  }
-
-  else if (state.sort === "oldest") {
-
-    list.sort(
-      (a, b) =>
-        (a.createdAt || 0) -
-        (b.createdAt || 0)
-    );
-
-  }
-
-  else if (state.sort === "az") {
-
-    list.sort(
-      (a, b) =>
-        String(a.title).localeCompare(
-          String(b.title)
-        )
-    );
-
-  }
-
-  else if (state.sort === "za") {
-
-    list.sort(
-      (a, b) =>
-        String(b.title).localeCompare(
-          String(a.title)
-        )
-    );
-
-  }
-
-  else if (state.sort === "played") {
-
-    list.sort(
-      (a, b) =>
-        (b.plays || 0) -
-        (a.plays || 0)
-    );
-
-  }
-
-
-  state.filtered = list;
-
-  renderSongs();
-
-  $("#songCount").textContent =
-    list.length;
-}
-
-
-function syncGenreChips() {
-
-  $$(".chip").forEach((chip) => {
-
-    chip.classList.toggle(
-      "active",
-      chip.dataset.genre === state.genre
-    );
-
-  });
-
-}
-
-/* ==========================================================
-   RENDER SONGS
-========================================================== */
-
-function renderSongs() {
-
-  const container = $("#songList");
-
-  if (!state.filtered.length) {
-
-    container.innerHTML = `
-      <div class="empty-state">
-
-        <div class="empty-icon">
-          ♪
-        </div>
-
-        <h3>
-          ${
-            state.search ||
-            state.genre !== "all"
-              ? "Tidak ada hasil"
-              : "Belum ada lagu"
-          }
-        </h3>
-
-        <p>
-          ${
-            state.search ||
-            state.genre !== "all"
-              ? "Coba ubah pencarian atau filter."
-              : "Tambahkan rekaman pertama ke Music Library KOMSI."
-          }
-        </p>
-
-        ${
-          state.search ||
-          state.genre !== "all"
-            ? ""
-            : `
-              <button
-                class="primary-btn small"
-                id="emptyUploadBtn"
-              >
-                Tambah Lagu
-              </button>
-            `
-        }
-
-      </div>
-    `;
-
-
-    $("#emptyUploadBtn")
-      ?.addEventListener(
-        "click",
-        openModal
-      );
-
-    return;
-  }
-
-
-  container.innerHTML =
-    state.filtered
-      .map((song) => {
-
-        const cover =
-          song.coverBlob
-            ? URL.createObjectURL(
-                song.coverBlob
-              )
-            : "";
-
-
-        return `
-          <article
-            class="song-card"
-            data-id="${escapeHTML(song.id)}"
-          >
-
-            <div class="song-cover">
-
-              ${
-                cover
-                  ? `
-                    <img
-                      src="${cover}"
-                      alt="${escapeHTML(song.title)}"
-                    >
-                  `
-                  : `
-                    <div class="default-cover">
-                      <span>♪</span>
-                    </div>
-                  `
-              }
-
-              <button
-                class="play-card-btn"
-                data-action="play"
-                data-id="${escapeHTML(song.id)}"
-                aria-label="Putar"
-              >
-                ▶
-              </button>
-
-            </div>
-
-
-            <div class="song-info">
-
-              <h3>
-                ${escapeHTML(song.title)}
-              </h3>
-
-              <p class="song-artist">
-                ${escapeHTML(
-                  song.artist ||
-                  "Unknown Artist"
-                )}
-              </p>
-
-              <div class="song-meta">
-
-                <span>
-                  ${escapeHTML(
-                    song.genre ||
-                    "Other"
-                  )}
-                </span>
-
-                <span>
-                  ${Number(
-                    song.plays || 0
-                  )} plays
-                </span>
-
-              </div>
-
-            </div>
-
-
-            <div class="song-actions">
-
-              <button
-                class="icon-btn"
-                data-action="play"
-                data-id="${escapeHTML(song.id)}"
-                title="Putar"
-              >
-                ▶
-              </button>
-
-              <button
-                class="icon-btn danger"
-                data-action="delete"
-                data-id="${escapeHTML(song.id)}"
-                title="Hapus"
-              >
-                ×
-              </button>
-
-            </div>
-
-          </article>
-        `;
-
-      })
-      .join("");
-
-
-  /* ACTION BUTTONS */
-
-  $$("#songList [data-action]")
-    .forEach((button) => {
-
-      button.addEventListener(
-        "click",
-        async () => {
-
-          const action =
-            button.dataset.action;
-
-          const songId =
-            button.dataset.id;
-
-
-          if (action === "play") {
-
-            await playById(songId);
-
-          }
-
-
-          if (action === "delete") {
-
-            await deleteById(songId);
-
-          }
-
-        }
-      );
-
-    });
-}
-
-/* ==========================================================
-   PLAYER
-========================================================== */
-
-async function playById(songId) {
-
-  const index =
-    state.filtered.findIndex(
-      (song) =>
-        song.id === songId
-    );
-
-  const song =
-    state.filtered[index];
-
-
-  if (!song?.audioBlob) {
-
-    toast(
-      "File audio tidak tersedia.",
-      "error"
-    );
-
-    return;
-  }
-
-
-  state.currentIndex = index;
-
-  state.currentSong = song;
-
-
-  audio.pause();
-
-  audio.src =
-    URL.createObjectURL(
-      song.audioBlob
-    );
-
-  audio.currentTime = 0;
-
-  audio.volume =
-    state.muted
-      ? 0
-      : state.volume;
-
-
-  try {
-
-    await audio.play();
-
-
-    song.plays =
-      Number(song.plays || 0) + 1;
-
-
-    await putSong(song);
-
-
-    state.songs =
-      state.songs.map(
-        (item) =>
-          item.id === song.id
-            ? song
-            : item
-      );
-
-
-    applyFilters();
-
-  }
-
-  catch (error) {
-
-    console.error(error);
-
-    toast(
-      "Audio tidak dapat diputar.",
-      "error"
-    );
-
-  }
-
-
-  updatePlayer();
-}
-
-
-async function togglePlay() {
-
-  if (!state.currentSong) {
-
-    if (state.filtered.length) {
-
-      await playById(
-        state.filtered[0].id
-      );
-
-    }
-
-    return;
-  }
-
-
-  if (audio.paused) {
-
-    try {
-
-      await audio.play();
-
-    }
-
-    catch (error) {
-
-      console.error(error);
-
-    }
-
-  }
-
-  else {
-
-    audio.pause();
-
-  }
-
-}
-
-
-async function next() {
-
-  if (!state.filtered.length) {
-    return;
-  }
-
-
-  let index =
-    state.currentIndex + 1;
-
-
-  if (
-    index >= state.filtered.length ||
-    state.currentIndex < 0
-  ) {
-
-    index = 0;
-
-  }
-
-
-  await playById(
-    state.filtered[index].id
-  );
-}
-
-
-async function previous() {
-
-  if (!state.filtered.length) {
-    return;
-  }
-
-
-  let index =
-    state.currentIndex - 1;
-
-
-  if (index < 0) {
-
-    index =
-      state.filtered.length - 1;
-
-  }
-
-
-  await playById(
-    state.filtered[index].id
-  );
-}
-
-
-/* ==========================================================
-   PLAYER UI
-========================================================== */
-
-function updatePlayer() {
-
-  const song =
-    state.currentSong;
-
-
-  $("#playerTitle").textContent =
-    song?.title ||
-    "Belum ada lagu";
-
-
-  $("#playerArtist").textContent =
-    song?.artist ||
-    "Pilih musik untuk mulai";
-
-
-  $("#playBtn").textContent =
-    state.playing
-      ? "Ⅱ"
-      : "▶";
-
-
-  $("#muteBtn").textContent =
-    state.muted ||
-    state.volume === 0
-      ? "🔇"
-      : "🔊";
-
-
-  $("#volumeControl").value =
-    state.muted
-      ? 0
-      : state.volume;
-
-
-  const cover =
-    $("#playerCover");
-
-
-  if (song?.coverBlob) {
-
-    cover.innerHTML = `
-      <img
-        src="${URL.createObjectURL(
-          song.coverBlob
-        )}"
-        alt=""
-      >
-    `;
-
-  }
-
-  else {
-
-    cover.innerHTML =
-      `<span>♪</span>`;
-
-  }
-
-
-  $("#currentTime").textContent =
-    formatTime(
-      audio.currentTime
-    );
-
-
-  $("#duration").textContent =
-    formatTime(
-      audio.duration
-    );
-
-
-  updateProgress();
-}
-
-
-function updateProgress() {
-
-  const percent =
-    Number.isFinite(
-      audio.duration
-    ) &&
-    audio.duration > 0
-
-      ? (
-          audio.currentTime /
-          audio.duration
-        ) * 100
-
-      : 0;
-
-
-  $("#progressBar").value =
-    percent;
-
-
-  $("#currentTime").textContent =
-    formatTime(
-      audio.currentTime
-    );
-}
-
-
-/* ==========================================================
-   MUTE
-========================================================== */
-
-function toggleMute() {
-
-  state.muted =
-    !state.muted;
-
-
-  audio.volume =
-    state.muted
-      ? 0
-      : state.volume;
-
-
-  updatePlayer();
-}
-
-/* ==========================================================
-   UPLOAD SONG
-========================================================== */
-
-async function uploadSong(event) {
-
-  event.preventDefault();
-
-
-  const form =
-    event.currentTarget;
-
-
-  const formData =
-    new FormData(form);
-
-
-  const audioFile =
-    formData.get("audio");
-
-
-  const coverFile =
-    formData.get("cover");
-
-
-  if (
-    !audioFile ||
-    !audioFile.type?.startsWith(
-      "audio/"
-    )
-  ) {
-
-    toast(
-      "Pilih file audio yang valid.",
-      "error"
-    );
-
-    return;
-  }
-
-
-  const song = {
-
-    id: generateId(),
-
-    title:
-      String(
-        formData.get("title") ||
-        "Tanpa Judul"
-      ).trim(),
-
-    artist:
-      String(
-        formData.get("artist") ||
-        "Unknown Artist"
-      ).trim(),
-
-    album:
-      String(
-        formData.get("album") ||
-        ""
-      ).trim(),
-
-    genre:
-      String(
-        formData.get("genre") ||
-        "Other"
-      ),
-
-    audioBlob:
-      audioFile,
-
-    coverBlob:
-      coverFile instanceof File &&
-      coverFile.size
-        ? coverFile
-        : null,
-
-    plays: 0,
-
-    createdAt:
-      Date.now()
-
+/* KOMSI MUSIC LIBRARY — Supabase version
+   Public visitors can browse and play songs.
+   Only the configured admin email can upload or delete songs.
+*/
+(() => {
+  "use strict";
+
+  const SUPABASE_URL = "https://dqbzjzsteuaraqfsatpb.supabase.co";
+  const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_b3ft4ELVXRGVtOayaRd8YA_QxVl5E1p";
+  const ADMIN_EMAIL = "webukmkomsiuinkhasjember@gmail.com";
+  const AUDIO_BUCKET = "audio";
+  const COVER_BUCKET = "covers";
+
+  const $ = (selector) => document.querySelector(selector);
+  const $$ = (selector) => [...document.querySelectorAll(selector)];
+
+  let db = null;
+  let songs = [];
+  let filteredSongs = [];
+  let activeSongIndex = -1;
+  let currentUser = null;
+  let audio = new Audio();
+  audio.preload = "metadata";
+
+  const els = {
+    search: $("#searchInput"),
+    genre: $("#genreFilter"),
+    sort: $("#sortSelect"),
+    songList: $("#songList"),
+    songCount: $("#songCount"),
+    addSongBtn: $("#addSongBtn"),
+    emptyUploadBtn: $("#emptyUploadBtn"),
+    heroAdminBtn: $("#heroAdminBtn"),
+    mobileAdminBtn: $("#mobileAdminBtn"),
+    closeModal: $("#closeModal"),
+    cancelUpload: $("#cancelUpload"),
+    uploadModal: $("#uploadModal"),
+    uploadForm: $("#uploadForm"),
+    audioFile: $("#audioFile"),
+    coverFile: $("#coverFile"),
+    audioFileName: $("#audioFileName"),
+    coverFileName: $("#coverFileName"),
+    playBtn: $("#playBtn"),
+    prevBtn: $("#prevBtn"),
+    nextBtn: $("#nextBtn"),
+    muteBtn: $("#muteBtn"),
+    volumeControl: $("#volumeControl"),
+    progressBar: $("#progressBar"),
+    playerTitle: $("#playerTitle"),
+    playerArtist: $("#playerArtist"),
+    playerCover: $("#playerCover"),
+    currentTime: $("#currentTime"),
+    duration: $("#duration"),
+    menuToggle: $("#menuToggle"),
+    mobileMenu: $("#mobileMenu"),
+    toast: $("#toast")
   };
 
+  function showToast(message, isError = false) {
+    if (!els.toast) {
+      console[isError ? "error" : "log"](message);
+      return;
+    }
+    els.toast.textContent = message;
+    els.toast.classList.toggle("error", isError);
+    els.toast.classList.add("show");
+    clearTimeout(showToast.timer);
+    showToast.timer = setTimeout(() => els.toast.classList.remove("show"), 3200);
+  }
 
-  try {
+  function escapeHtml(value = "") {
+    return String(value).replace(/[&<>"']/g, (char) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    }[char]));
+  }
 
-    await putSong(song);
+  function formatTime(seconds) {
+    if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60).toString().padStart(2, "0");
+    return `${mins}:${secs}`;
+  }
 
+  function safeText(value, fallback = "") {
+    return value == null || value === "" ? fallback : String(value);
+  }
 
-    state.songs.push(song);
+  function isAdmin() {
+    return !!currentUser && currentUser.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  }
 
+  function setAdminUI() {
+    const adminButtons = [els.addSongBtn, els.emptyUploadBtn, els.heroAdminBtn, els.mobileAdminBtn];
+    adminButtons.forEach((button) => {
+      if (button) button.hidden = !isAdmin();
+    });
+    const loginButtons = $$("[data-admin-login]");
+    loginButtons.forEach((button) => {
+      button.hidden = isAdmin();
+    });
+    const logoutButtons = $$("[data-admin-logout]");
+    logoutButtons.forEach((button) => {
+      button.hidden = !isAdmin();
+    });
+  }
 
-    closeModal();
+  async function ensureSupabase() {
+    if (window.supabase?.createClient) {
+      db = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+      return;
+    }
+    await new Promise((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
+      script.onload = resolve;
+      script.onerror = () => reject(new Error("Tidak bisa memuat library Supabase. Periksa koneksi internet."));
+      document.head.appendChild(script);
+    });
+    if (!window.supabase?.createClient) throw new Error("Library Supabase tidak berhasil dimuat.");
+    db = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+  }
 
+  async function loadSession() {
+    const { data, error } = await db.auth.getSession();
+    if (error) console.warn("Session:", error.message);
+    currentUser = data?.session?.user || null;
+    if (currentUser && !isAdmin()) {
+      await db.auth.signOut();
+      currentUser = null;
+      showToast("Akun ini tidak memiliki akses admin.", true);
+    }
+    setAdminUI();
+  }
 
-    form.reset();
-
-
-    $("#audioFileName").textContent =
-      "Belum dipilih";
-
-
-    $("#coverFileName").textContent =
-      "Opsional";
-
-
+  async function loadSongs() {
+    if (els.songList) {
+      els.songList.innerHTML = '<div class="loading-state">Memuat koleksi musik...</div>';
+    }
+    const { data, error } = await db.from("songs").select("*").order("created_at", { ascending: false });
+    if (error) {
+      console.error(error);
+      if (els.songList) els.songList.innerHTML = '<div class="empty-state"><h3>Musik belum dapat dimuat</h3><p>Periksa koneksi Supabase dan kebijakan akses tabel songs.</p></div>';
+      showToast("Gagal memuat lagu: " + error.message, true);
+      return;
+    }
+    songs = data || [];
+    populateGenres();
     applyFilters();
-
-
-    toast(
-      "Lagu berhasil ditambahkan.",
-      "success"
-    );
-
   }
 
-  catch (error) {
-
-    console.error(error);
-
-    toast(
-      "Gagal menyimpan lagu.",
-      "error"
-    );
-
-  }
-}
-
-/* ==========================================================
-   DELETE SONG
-========================================================== */
-
-async function deleteById(songId) {
-
-  const song =
-    state.songs.find(
-      (item) =>
-        item.id === songId
-    );
-
-
-  if (!song) {
-    return;
+  function populateGenres() {
+    if (!els.genre) return;
+    const selected = els.genre.value;
+    const genres = [...new Set(songs.map(song => safeText(song.genre).trim()).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b));
+    els.genre.innerHTML = '<option value="">Semua genre</option>' +
+      genres.map(genre => `<option value="${escapeHtml(genre)}">${escapeHtml(genre)}</option>`).join("");
+    if (genres.includes(selected)) els.genre.value = selected;
   }
 
+  function applyFilters() {
+    const query = safeText(els.search?.value).toLowerCase().trim();
+    const genre = safeText(els.genre?.value);
+    const sort = safeText(els.sort?.value, "newest");
 
-  const confirmed =
-    confirm(
-      `Hapus "${song.title}" dari Music Library?`
-    );
+    filteredSongs = songs.filter(song => {
+      const matchesText = [song.title, song.artist, song.genre]
+        .some(value => safeText(value).toLowerCase().includes(query));
+      return matchesText && (!genre || song.genre === genre);
+    });
 
+    if (sort === "title") filteredSongs.sort((a, b) => safeText(a.title).localeCompare(safeText(b.title)));
+    else if (sort === "popular") filteredSongs.sort((a, b) => (b.play_count || 0) - (a.play_count || 0));
+    else filteredSongs.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
 
-  if (!confirmed) {
-    return;
+    renderSongs();
   }
 
-
-  try {
-
-    await removeSong(songId);
-
-
-    state.songs =
-      state.songs.filter(
-        (item) =>
-          item.id !== songId
-      );
-
-
-    if (
-      state.currentSong?.id ===
-      songId
-    ) {
-
-      audio.pause();
-
-      audio.src = "";
-
-      state.currentSong =
-        null;
-
-      state.currentIndex =
-        -1;
-
-      state.playing =
-        false;
-
+  function renderSongs() {
+    if (els.songCount) els.songCount.textContent = `${filteredSongs.length} lagu`;
+    if (!els.songList) return;
+    if (!filteredSongs.length) {
+      els.songList.innerHTML = `<div class="empty-state">
+        <h3>${songs.length ? "Lagu tidak ditemukan" : "Belum ada lagu"}</h3>
+        <p>${songs.length ? "Coba kata kunci atau genre lain." : "Koleksi lagu akan tampil di sini setelah admin mengunggah musik."}</p>
+      </div>`;
+      return;
     }
 
-
-    applyFilters();
-
-    updatePlayer();
-
-
-    toast(
-      "Lagu berhasil dihapus.",
-      "success"
-    );
-
+    els.songList.innerHTML = filteredSongs.map((song, index) => {
+      const cover = song.cover_url
+        ? `<img src="${escapeHtml(song.cover_url)}" alt="" loading="lazy" onerror="this.style.display='none'">`
+        : `<span class="cover-placeholder">♫</span>`;
+      const deleteButton = isAdmin()
+        ? `<button class="song-delete" type="button" data-delete="${escapeHtml(song.id)}" aria-label="Hapus ${escapeHtml(song.title)}" title="Hapus lagu">Hapus</button>`
+        : "";
+      return `<article class="song-card" data-song-index="${index}">
+        <button class="song-play" type="button" data-play="${index}" aria-label="Putar ${escapeHtml(song.title)}">
+          <span class="song-cover">${cover}</span>
+          <span class="song-info"><strong>${escapeHtml(song.title || "Tanpa judul")}</strong>
+          <span>${escapeHtml(song.artist || "Artis tidak diketahui")}</span>
+          <small>${escapeHtml(song.genre || "Lainnya")}</small></span>
+          <span class="song-play-icon" aria-hidden="true">▶</span>
+        </button>${deleteButton}
+      </article>`;
+    }).join("");
   }
 
-  catch (error) {
-
-    console.error(error);
-
-    toast(
-      "Gagal menghapus lagu.",
-      "error"
-    );
-
+  function updatePlayer(song) {
+    if (els.playerTitle) els.playerTitle.textContent = song?.title || "Pilih lagu";
+    if (els.playerArtist) els.playerArtist.textContent = song?.artist || "KOMSI Music Library";
+    if (els.playerCover) {
+      if (song?.cover_url) {
+        els.playerCover.src = song.cover_url;
+        els.playerCover.alt = `Cover ${song.title || "lagu"}`;
+      } else {
+        els.playerCover.removeAttribute("src");
+        els.playerCover.alt = "";
+      }
+    }
   }
-}
 
-/* ==========================================================
-   MODAL
-========================================================== */
+  async function playSong(index) {
+    const song = filteredSongs[index];
+    if (!song?.audio_url) {
+      showToast("URL audio lagu ini belum tersedia.", true);
+      return;
+    }
+    activeSongIndex = index;
+    updatePlayer(song);
+    audio.src = song.audio_url;
+    try {
+      await audio.play();
+      if (els.playBtn) els.playBtn.textContent = "Ⅱ";
+      // Do not update play_count from public clients; current RLS correctly restricts table writes.
+    } catch (error) {
+      console.error(error);
+      showToast("Lagu tidak bisa diputar. Periksa URL audio dan pengaturan bucket audio.", true);
+    }
+  }
 
-function openModal() {
+  function togglePlay() {
+    if (!audio.src) {
+      if (filteredSongs.length) playSong(0);
+      else showToast("Belum ada lagu untuk diputar.");
+      return;
+    }
+    if (audio.paused) audio.play().catch(() => showToast("Gagal memutar audio.", true));
+    else audio.pause();
+  }
 
-  const modal =
-    $("#uploadModal");
+  function nextSong(direction = 1) {
+    if (!filteredSongs.length) return;
+    const next = activeSongIndex < 0
+      ? 0
+      : (activeSongIndex + direction + filteredSongs.length) % filteredSongs.length;
+    playSong(next);
+  }
 
+  function openUploadModal() {
+    if (!isAdmin()) {
+      showToast("Login sebagai admin untuk mengunggah lagu.", true);
+      return;
+    }
+    if (els.uploadModal) {
+      els.uploadModal.hidden = false;
+      els.uploadModal.classList.add("open");
+    } else {
+      showToast("Form unggah tidak ditemukan di index.html.", true);
+    }
+  }
 
-  modal.classList.add(
-    "open"
-  );
+  function closeUploadModal() {
+    if (!els.uploadModal) return;
+    els.uploadModal.classList.remove("open");
+    els.uploadModal.hidden = true;
+  }
 
+  async function uploadFile(bucket, file, path) {
+    const { error } = await db.storage.from(bucket).upload(path, file, {
+      cacheControl: "3600",
+      upsert: false,
+      contentType: file.type || undefined
+    });
+    if (error) throw error;
+    const { data } = db.storage.from(bucket).getPublicUrl(path);
+    return data.publicUrl;
+  }
 
-  modal.setAttribute(
-    "aria-hidden",
-    "false"
-  );
-
-
-  document.body.style.overflow =
-    "hidden";
-}
-
-
-function closeModal() {
-
-  const modal =
-    $("#uploadModal");
-
-
-  modal.classList.remove(
-    "open"
-  );
-
-
-  modal.setAttribute(
-    "aria-hidden",
-    "true"
-  );
-
-
-  document.body.style.overflow =
-    "";
-}
-
-/* ==========================================================
-   TOAST
-========================================================== */
-
-let toastTimer;
-
-
-function toast(
-  message,
-  type = "info"
-) {
-
-  const element =
-    $("#toast");
-
-
-  element.textContent =
-    message;
-
-
-  element.className =
-    `toast ${type} show`;
-
-
-  clearTimeout(
-    toastTimer
-  );
-
-
-  toastTimer =
-    setTimeout(() => {
-
-      element.classList.remove(
-        "show"
-      );
-
-    }, 2800);
-}
-
-/* ==========================================================
-   KEYBOARD SHORTCUTS
-========================================================== */
-
-function keyboard(event) {
-
-  const tag =
-    document.activeElement?.tagName;
-
-
-  const typing =
-    [
-      "INPUT",
-      "TEXTAREA",
-      "SELECT"
-    ].includes(tag);
-
-
-  /* CTRL + K */
-
-  if (
-    (event.ctrlKey ||
-      event.metaKey) &&
-    event.key.toLowerCase() === "k"
-  ) {
-
+  async function handleUpload(event) {
     event.preventDefault();
+    if (!isAdmin()) {
+      showToast("Akses admin diperlukan.", true);
+      return;
+    }
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    const title = safeText(formData.get("title")).trim();
+    const artist = safeText(formData.get("artist")).trim();
+    const genre = safeText(formData.get("genre")).trim();
+    const audioFile = form.querySelector('input[type="file"][accept*="audio"]')?.files?.[0]
+      || els.audioFile?.files?.[0];
+    const coverFile = form.querySelector('input[type="file"][accept*="image"]')?.files?.[0]
+      || els.coverFile?.files?.[0];
 
-    $("#searchInput").focus();
+    if (!title || !artist || !audioFile) {
+      showToast("Isi judul, nama artis, dan pilih file audio.", true);
+      return;
+    }
 
+    const submit = form.querySelector('[type="submit"]');
+    if (submit) { submit.disabled = true; submit.textContent = "Mengunggah..."; }
+    let audioPath = "";
+    let coverPath = "";
+    try {
+      const id = (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
+      const audioExt = (audioFile.name.split(".").pop() || "mp3").replace(/[^a-zA-Z0-9]/g, "");
+      audioPath = `${id}.${audioExt}`;
+      const audioUrl = await uploadFile(AUDIO_BUCKET, audioFile, audioPath);
+      let coverUrl = null;
+      if (coverFile) {
+        const coverExt = (coverFile.name.split(".").pop() || "jpg").replace(/[^a-zA-Z0-9]/g, "");
+        coverPath = `${id}.${coverExt}`;
+        coverUrl = await uploadFile(COVER_BUCKET, coverFile, coverPath);
+      }
+
+      const { error } = await db.from("songs").insert({
+        title, artist, genre: genre || "Lainnya",
+        audio_url: audioUrl, cover_url: coverUrl, duration: null, play_count: 0
+      });
+      if (error) throw error;
+      form.reset();
+      if (els.audioFileName) els.audioFileName.textContent = "";
+      if (els.coverFileName) els.coverFileName.textContent = "";
+      closeUploadModal();
+      showToast("Lagu berhasil ditambahkan!");
+      await loadSongs();
+    } catch (error) {
+      console.error(error);
+      showToast("Upload gagal: " + (error.message || "Terjadi kesalahan"), true);
+      // Uploaded files may remain if inserting the row failed; no automatic deletion is attempted.
+    } finally {
+      if (submit) { submit.disabled = false; submit.textContent = "Unggah Lagu"; }
+    }
   }
 
-
-  if (typing) {
-    return;
+  async function deleteSong(id) {
+    if (!isAdmin()) return showToast("Akses admin diperlukan.", true);
+    const song = songs.find(item => String(item.id) === String(id));
+    if (!song || !confirm(`Hapus lagu "${song.title}"? Tindakan ini tidak bisa dibatalkan.`)) return;
+    try {
+      const removePaths = (url, bucket) => {
+        if (!url) return null;
+        const marker = `/storage/v1/object/public/${bucket}/`;
+        const position = url.indexOf(marker);
+        return position >= 0 ? decodeURIComponent(url.slice(position + marker.length).split("?")[0]) : null;
+      };
+      const audioPath = removePaths(song.audio_url, AUDIO_BUCKET);
+      const coverPath = removePaths(song.cover_url, COVER_BUCKET);
+      const { error } = await db.from("songs").delete().eq("id", id);
+      if (error) throw error;
+      if (audioPath) await db.storage.from(AUDIO_BUCKET).remove([audioPath]);
+      if (coverPath) await db.storage.from(COVER_BUCKET).remove([coverPath]);
+      showToast("Lagu berhasil dihapus.");
+      await loadSongs();
+    } catch (error) {
+      console.error(error);
+      showToast("Gagal menghapus lagu: " + error.message, true);
+    }
   }
 
-
-  /* SPACE = PLAY */
-
-  if (
-    event.code === "Space"
-  ) {
-
-    event.preventDefault();
-
-    togglePlay();
-
+  async function loginAdmin() {
+    if (!db) return;
+    const email = prompt("Email admin:");
+    if (!email) return;
+    if (email.trim().toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
+      showToast("Email ini bukan email admin yang diizinkan.", true);
+      return;
+    }
+    const password = prompt("Password akun Supabase admin:");
+    if (!password) return;
+    const { data, error } = await db.auth.signInWithPassword({ email: email.trim(), password });
+    if (error) {
+      showToast("Login gagal: " + error.message, true);
+      return;
+    }
+    if (data.user?.email?.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
+      await db.auth.signOut();
+      currentUser = null;
+      setAdminUI();
+      showToast("Akun tidak memiliki akses admin.", true);
+      return;
+    }
+    currentUser = data.user;
+    setAdminUI();
+    renderSongs();
+    showToast("Login admin berhasil.");
   }
 
-
-  /* ARROW RIGHT */
-
-  if (
-    event.code === "ArrowRight"
-  ) {
-
-    next();
-
+  async function logoutAdmin() {
+    const { error } = await db.auth.signOut();
+    if (error) return showToast("Logout gagal: " + error.message, true);
+    currentUser = null;
+    setAdminUI();
+    renderSongs();
+    showToast("Berhasil logout.");
   }
 
+  function bindEvents() {
+    els.search?.addEventListener("input", applyFilters);
+    els.genre?.addEventListener("change", applyFilters);
+    els.sort?.addEventListener("change", applyFilters);
+    $$(".chip").forEach(chip => chip.addEventListener("click", () => {
+      $$(".chip").forEach(item => item.classList.remove("active"));
+      chip.classList.add("active");
+      const genre = chip.dataset.genre || chip.dataset.filter || "";
+      if (els.genre) els.genre.value = genre;
+      applyFilters();
+    }));
 
-  /* ARROW LEFT */
+    [els.addSongBtn, els.emptyUploadBtn, els.heroAdminBtn, els.mobileAdminBtn]
+      .forEach(button => button?.addEventListener("click", openUploadModal));
+    els.closeModal?.addEventListener("click", closeUploadModal);
+    els.cancelUpload?.addEventListener("click", closeUploadModal);
+    els.uploadForm?.addEventListener("submit", handleUpload);
+    $$("[data-admin-login]").forEach(button => button.addEventListener("click", loginAdmin));
+    $$("[data-admin-logout]").forEach(button => button.addEventListener("click", logoutAdmin));
 
-  if (
-    event.code === "ArrowLeft"
-  ) {
+    els.songList?.addEventListener("click", event => {
+      const playButton = event.target.closest("[data-play]");
+      const deleteButton = event.target.closest("[data-delete]");
+      if (playButton) playSong(Number(playButton.dataset.play));
+      if (deleteButton) deleteSong(deleteButton.dataset.delete);
+    });
 
-    previous();
+    els.playBtn?.addEventListener("click", togglePlay);
+    els.prevBtn?.addEventListener("click", () => nextSong(-1));
+    els.nextBtn?.addEventListener("click", () => nextSong(1));
+    els.volumeControl?.addEventListener("input", () => {
+      audio.volume = Number(els.volumeControl.value);
+      audio.muted = false;
+    });
+    els.muteBtn?.addEventListener("click", () => {
+      audio.muted = !audio.muted;
+      els.muteBtn.textContent = audio.muted ? "Unmute" : "Mute";
+    });
+    els.progressBar?.addEventListener("input", () => {
+      if (Number.isFinite(audio.duration) && audio.duration > 0) {
+        audio.currentTime = (Number(els.progressBar.value) / 100) * audio.duration;
+      }
+    });
+    audio.addEventListener("timeupdate", () => {
+      if (els.currentTime) els.currentTime.textContent = formatTime(audio.currentTime);
+      if (els.progressBar && Number.isFinite(audio.duration) && audio.duration > 0) {
+        els.progressBar.value = String((audio.currentTime / audio.duration) * 100);
+      }
+    });
+    audio.addEventListener("loadedmetadata", () => {
+      if (els.duration) els.duration.textContent = formatTime(audio.duration);
+      if (els.progressBar) els.progressBar.value = "0";
+    });
+    audio.addEventListener("ended", () => {
+      if (els.playBtn) els.playBtn.textContent = "▶";
+      nextSong(1);
+    });
+    audio.addEventListener("pause", () => { if (els.playBtn) els.playBtn.textContent = "▶"; });
+    audio.addEventListener("play", () => { if (els.playBtn) els.playBtn.textContent = "Ⅱ"; });
 
+    els.audioFile?.addEventListener("change", () => {
+      if (els.audioFileName) els.audioFileName.textContent = els.audioFile.files?.[0]?.name || "";
+    });
+    els.coverFile?.addEventListener("change", () => {
+      if (els.coverFileName) els.coverFileName.textContent = els.coverFile.files?.[0]?.name || "";
+    });
+    els.menuToggle?.addEventListener("click", () => els.mobileMenu?.classList.toggle("open"));
   }
-}
 
+  async function init() {
+    bindEvents();
+    try {
+      await ensureSupabase();
+      await loadSession();
+      db.auth.onAuthStateChange((_event, session) => {
+        currentUser = session?.user || null;
+        if (currentUser && currentUser.email?.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
+          db.auth.signOut().catch(console.error);
+          currentUser = null;
+        }
+        setAdminUI();
+        renderSongs();
+      });
+      await loadSongs();
+    } catch (error) {
+      console.error(error);
+      if (els.songList) els.songList.innerHTML = '<div class="empty-state"><h3>Koneksi belum siap</h3><p>Periksa koneksi internet dan konfigurasi Supabase di app.js.</p></div>';
+      showToast(error.message || "Gagal menginisialisasi Supabase.", true);
+    }
+  }
 
-/* ==========================================================
-   GLOBAL KOMSI API
-========================================================== */
-
-window.KOMSI = {
-
-  state,
-
-  playById,
-
-  next,
-
-  previous,
-
-  togglePlay,
-
-  openModal,
-
-  closeModal
-
-};
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
+  else init();
+})();
