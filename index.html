@@ -1,216 +1,139 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#080809">
-  <meta name="description" content="KOMSI Music Library — karya, rekaman, dan suara dari panggung UKM Komunitas Seni UIN KHAS Jember.">
-  <title>Musik KOMSI — Music Library</title>
-  <link rel="stylesheet" href="style.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101014">
+  <meta name="description" content="KOMSI Music Library — ruang untuk menemukan dan menikmati musik.">
+  <title>KOMSI Music Library</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=final1">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script defer src="app.js?v=final1"></script>
 </head>
 <body>
   <div class="app-shell">
-    <header class="topbar">
-      <a class="brand" href="#" aria-label="KOMSI Music Library">
-        <span class="brand-mark">K</span>
-        <span class="brand-word">KOMSI<span>.</span></span>
+    <aside class="sidebar">
+      <a class="brand" href="#" aria-label="KOMSI Music Library beranda">
+        <span class="brand-mark"><span></span><span></span><span></span></span>
+        <span class="brand-copy"><strong>KOMSI</strong><small>MUSIC LIBRARY</small></span>
       </a>
-
-      <nav class="desktop-nav" aria-label="Navigasi utama">
-        <a class="nav-link active" href="#home">Beranda</a>
-        <a class="nav-link" href="#library">Music Library</a>
-        <a class="nav-link" href="#about">Tentang</a>
+      <div class="side-label">MENU</div>
+      <nav class="side-nav" aria-label="Navigasi utama">
+        <button class="nav-item active" id="homeNav" type="button"><span class="nav-icon">⌂</span> Discover</button>
+        <button class="nav-item" id="allSongsNav" type="button"><span class="nav-icon">♫</span> Semua Lagu</button>
       </nav>
+      <div class="sidebar-bottom">
+        <div class="sidebar-note">
+          <span class="note-icon">✦</span>
+          <strong>Music connects us.</strong>
+          <p>Temukan lagu, simpan momen, dan nikmati setiap nada.</p>
+        </div>
+        <p class="side-foot">© <span id="yearText"></span> KOMSI</p>
+      </div>
+    </aside>
 
-      <button class="menu-toggle" id="menuToggle" aria-label="Buka menu" aria-expanded="false">
-        <span></span><span></span><span></span>
-      </button>
-    </header>
+    <main class="main-content">
+      <header class="topbar">
+        <div class="mobile-brand">
+          <span class="brand-mark"><span></span><span></span><span></span></span>
+          <strong>KOMSI</strong>
+        </div>
+        <label class="search-box" for="searchInput">
+          <span class="search-icon">⌕</span>
+          <input id="searchInput" type="search" placeholder="Cari judul, artis, atau genre..." autocomplete="off">
+          <kbd>SEARCH</kbd>
+        </label>
+        <div class="top-actions">
+          <span class="status-dot" aria-hidden="true"></span>
+          <span class="status-label" id="connectionStatus">Menghubungkan</span>
+          <button class="button button-outline" id="adminLoginBtn" type="button">Login Admin</button>
+          <button class="button button-primary" id="logoutBtn" type="button" hidden>Keluar</button>
+        </div>
+      </header>
 
-    <div class="mobile-menu" id="mobileMenu">
-      <a href="#home">Beranda</a>
-      <a href="#library">Music Library</a>
-      <a href="#about">Tentang KOMSI</a>
-      <button class="mobile-admin-btn" id="mobileAdminBtn">Admin / Upload</button>
-    </div>
-
-    <main>
-      <section class="hero" id="home">
-        <div class="hero-glow hero-glow-one"></div>
-        <div class="hero-glow hero-glow-two"></div>
-        <div class="hero-content">
-          <div class="eyebrow">UKM KOMUNITAS SENI · UIN KHAS JEMBER</div>
-          <h1>Musik <span>KOMSI</span></h1>
-          <p>Karya, rekaman, dan suara dari panggung kami. Temukan, dengarkan, dan simpan perjalanan musik KOMSI.</p>
+      <section class="hero">
+        <div class="hero-copy">
+          <div class="eyebrow"><span class="eyebrow-line"></span> YOUR CAMPUS MUSIC SPACE</div>
+          <h1>Every song has<br>a <span>story.</span></h1>
+          <p>Tempat berkumpulnya musik, kreativitas, dan cerita dalam satu ruang.</p>
           <div class="hero-actions">
-            <a class="primary-btn" href="#library">Jelajahi Musik <span>→</span></a>
-            <button class="ghost-btn" id="heroAdminBtn">Admin / Upload</button>
+            <button class="button button-light" id="exploreBtn" type="button">Jelajahi koleksi <span>↗</span></button>
+            <button class="button button-ghost" id="heroAdminBtn" type="button">＋ Tambah lagu</button>
           </div>
+          <div class="hero-meta"><span class="hero-meta-icon">♫</span><span id="heroMetaText">Koleksi musik KOMSI</span></div>
         </div>
         <div class="hero-art" aria-hidden="true">
-          <div class="disc disc-large"><span>♪</span></div>
-          <div class="disc disc-small"><span>♫</span></div>
-          <div class="sound-line line-1"></div>
-          <div class="sound-line line-2"></div>
-          <div class="sound-line line-3"></div>
+          <div class="art-glow"></div>
+          <div class="art-disc"><div class="disc-ring ring-one"></div><div class="disc-ring ring-two"></div><div class="disc-ring ring-three"></div><div class="disc-center">K<span>✦</span></div></div>
+          <div class="floating-tag tag-top">SOUND ON <span>↗</span></div>
+          <div class="floating-tag tag-bottom"><span class="equalizer"><i></i><i></i><i></i><i></i></span> FEEL THE MOMENT</div>
         </div>
+        <div class="hero-orb orb-one"></div><div class="hero-orb orb-two"></div>
       </section>
 
-      <section class="library-section" id="library">
+      <section class="stats-row" aria-label="Statistik koleksi">
+        <div class="stat-card"><span class="stat-icon">♫</span><div><span class="stat-label">TOTAL LAGU</span><strong id="totalSongs">0</strong></div></div>
+        <div class="stat-card"><span class="stat-icon">◉</span><div><span class="stat-label">GENRE</span><strong id="totalGenres">0</strong></div></div>
+        <div class="stat-card"><span class="stat-icon">✦</span><div><span class="stat-label">MUSIC SPACE</span><strong>Komsi</strong></div></div>
+      </section>
+
+      <section class="library-section" id="librarySection">
         <div class="section-heading">
-          <div>
-            <div class="section-label">MUSIC LIBRARY</div>
-            <h2>Semua Lagu <span id="songCount">0</span></h2>
+          <div><div class="eyebrow eyebrow-dark">PILIHAN UNTUKMU</div><h2>Jelajahi <span>koleksi</span></h2><p class="section-subtitle">Temukan lagu yang cocok dengan suasana hatimu.</p></div>
+          <button class="button button-outline add-song-button" id="addSongBtn" type="button">＋ Upload lagu</button>
+        </div>
+        <div class="filter-row">
+          <div class="genre-chips" id="genreChips">
+            <button class="chip active" data-genre="all" type="button">Semua</button>
           </div>
-          <button class="upload-top-btn" id="addSongBtn"><span>＋</span> Tambah Lagu</button>
+          <div class="sort-wrap"><label for="sortSelect">Urutkan</label><select id="sortSelect"><option value="newest">Terbaru</option><option value="oldest">Terlama</option><option value="az">Judul A–Z</option><option value="za">Judul Z–A</option><option value="played">Paling sering diputar</option></select></div>
         </div>
 
-        <div class="toolbar">
-          <label class="search-box">
-            <span class="search-icon">⌕</span>
-            <input id="searchInput" type="search" placeholder="Cari judul atau artis..." autocomplete="off">
-            <kbd>Ctrl K</kbd>
-          </label>
-
-          <label class="select-box">
-            <span>Genre</span>
-            <select id="genreFilter">
-              <option value="all">Semua Genre</option>
-              <option value="Pop">Pop</option>
-              <option value="Rock">Rock</option>
-              <option value="Jazz">Jazz</option>
-              <option value="Acoustic">Acoustic</option>
-              <option value="Instrumental">Instrumental</option>
-              <option value="Religi">Religi</option>
-              <option value="Other">Lainnya</option>
-            </select>
-          </label>
-
-          <label class="select-box">
-            <span>Urutkan</span>
-            <select id="sortSelect">
-              <option value="newest">Terbaru</option>
-              <option value="oldest">Terlama</option>
-              <option value="az">A — Z</option>
-              <option value="za">Z — A</option>
-              <option value="played">Paling Diputar</option>
-            </select>
-          </label>
-        </div>
-
-        <div class="quick-filters" id="quickFilters">
-          <button class="chip active" data-genre="all">Semua</button>
-          <button class="chip" data-genre="Pop">Pop</button>
-          <button class="chip" data-genre="Rock">Rock</button>
-          <button class="chip" data-genre="Acoustic">Acoustic</button>
-          <button class="chip" data-genre="Instrumental">Instrumental</button>
-          <button class="chip" data-genre="Religi">Religi</button>
-        </div>
-
-        <div class="songs-grid" id="songList">
-          <div class="empty-state">
-            <div class="empty-icon">♪</div>
-            <h3>Belum ada lagu</h3>
-            <p>Tambahkan rekaman pertama ke Music Library KOMSI.</p>
-            <button class="primary-btn small" id="emptyUploadBtn">Tambah Lagu</button>
-          </div>
-        </div>
+        <div id="loadingState" class="state-panel"><div class="loader"></div><strong>Menyiapkan koleksi musik...</strong><p>Sebentar, kami sedang mengambil daftar lagu.</p></div>
+        <div id="errorState" class="state-panel" hidden><div class="state-symbol">!</div><strong>Koleksi belum bisa dimuat</strong><p id="errorMessage">Periksa koneksi atau konfigurasi Supabase.</p><button class="button button-outline" id="retryBtn" type="button">Coba lagi</button></div>
+        <div id="emptyState" class="state-panel" hidden><div class="empty-disc">♫</div><strong>Belum ada lagu di sini</strong><p>Koleksi masih kosong. Admin dapat mulai menambahkan lagu.</p><button class="button button-primary" id="emptyUploadBtn" type="button">＋ Upload lagu pertama</button></div>
+        <div id="noResultsState" class="state-panel" hidden><div class="state-symbol">⌕</div><strong>Lagu tidak ditemukan</strong><p>Coba kata kunci atau filter genre yang berbeda.</p><button class="button button-outline" id="clearFiltersBtn" type="button">Hapus filter</button></div>
+        <div class="song-grid" id="songGrid"></div>
       </section>
-
-      <section class="about-section" id="about">
-        <div class="about-card">
-          <div class="section-label">TENTANG</div>
-          <h2>Suara KOMSI, disimpan dalam satu ruang.</h2>
-          <p>Music Library ini dirancang sebagai arsip digital karya, latihan, pertunjukan, dan rekaman musik KOMSI. Versi ini menggunakan penyimpanan lokal browser sebagai tahap awal dan siap dikembangkan ke database online.</p>
-          <div class="about-points">
-            <div><strong>01</strong><span>Arsip karya musik</span></div>
-            <div><strong>02</strong><span>Player yang ringan</span></div>
-            <div><strong>03</strong><span>Siap terhubung ke cloud</span></div>
-          </div>
-        </div>
-      </section>
+      <footer class="main-footer"><span><span class="footer-dot"></span> Dibuat untuk komunitas KOMSI</span><span>PLAY YOUR OWN STORY <b>✦</b></span></footer>
     </main>
-
-    <footer class="footer">
-      <div class="brand footer-brand"><span class="brand-mark">K</span><span class="brand-word">KOMSI<span>.</span></span></div>
-      <p>Music Library · UKM Komunitas Seni UIN KHAS Jember</p>
-      <span class="footer-note">Built for KOMSI</span>
-    </footer>
   </div>
 
-  <div class="player" id="player">
-    <div class="player-inner">
-      <div class="now-playing">
-        <div class="player-cover" id="playerCover"><span>♪</span></div>
-        <div class="now-text">
-          <div class="now-title" id="playerTitle">Belum ada lagu</div>
-          <div class="now-artist" id="playerArtist">Pilih musik untuk mulai</div>
-        </div>
-      </div>
-
-      <div class="player-center">
-        <div class="player-controls">
-          <button class="control-btn" id="prevBtn" title="Sebelumnya">↶</button>
-          <button class="main-play" id="playBtn" title="Putar / jeda">▶</button>
-          <button class="control-btn" id="nextBtn" title="Berikutnya">↷</button>
-        </div>
-        <div class="timeline">
-          <span id="currentTime">0:00</span>
-          <input id="progressBar" type="range" min="0" max="100" value="0" step="0.1" aria-label="Posisi lagu">
-          <span id="duration">0:00</span>
-        </div>
-      </div>
-
-      <div class="player-volume">
-        <button class="volume-btn" id="muteBtn" title="Mute">🔊</button>
-        <input id="volumeControl" type="range" min="0" max="1" value="0.8" step="0.01" aria-label="Volume">
-      </div>
+  <section class="player-bar" id="playerBar" aria-label="Pemutar musik">
+    <div class="player-track">
+      <div class="player-cover" id="playerCover"><span>♫</span></div>
+      <div class="player-track-copy"><strong id="playerTitle">Pilih lagu untuk diputar</strong><span id="playerArtist">KOMSI Music Library</span></div>
     </div>
-  </div>
+    <div class="player-controls">
+      <button class="player-control" id="prevBtn" type="button" aria-label="Lagu sebelumnya" title="Lagu sebelumnya">⏮</button>
+      <button class="player-play" id="playPauseBtn" type="button" aria-label="Putar atau jeda" title="Putar">▶</button>
+      <button class="player-control" id="nextBtn" type="button" aria-label="Lagu berikutnya" title="Lagu berikutnya">⏭</button>
+      <div class="progress-wrap"><span id="currentTime">0:00</span><input id="progressRange" type="range" min="0" max="100" value="0" aria-label="Posisi lagu"><span id="durationText">0:00</span></div>
+    </div>
+    <div class="player-volume"><span>♪</span><input id="volumeRange" type="range" min="0" max="1" step="0.05" value="0.8" aria-label="Volume"></div>
+    <audio id="audioElement" preload="metadata"></audio>
+  </section>
 
-  <div class="modal-backdrop" id="uploadModal" aria-hidden="true">
-    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
-      <button class="modal-close" id="closeModal" aria-label="Tutup">×</button>
-      <div class="section-label">MUSIC MANAGEMENT</div>
-      <h2 id="modalTitle">Tambah Lagu</h2>
-      <p class="modal-description">Tambahkan file audio dan cover. Pada V2, data masih disimpan di browser perangkat ini.</p>
-
+  <div class="modal-backdrop" id="uploadModal" hidden>
+    <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <div class="modal-header"><div><div class="eyebrow eyebrow-dark">ADMIN WORKSPACE</div><h2 id="modalTitle">Upload <span>lagu</span></h2><p>Tambahkan musik baru ke koleksi KOMSI.</p></div><button class="modal-close" id="closeModalBtn" type="button" aria-label="Tutup">×</button></div>
       <form id="uploadForm">
         <div class="form-grid">
-          <label>Judul Lagu<input name="title" required placeholder="Contoh: Senja di Kampus"></label>
-          <label>Artis / Band<input name="artist" placeholder="Nama artis atau band"></label>
-          <label>Album<input name="album" placeholder="Nama album (opsional)"></label>
-          <label>Genre<select name="genre"><option>Pop</option><option>Rock</option><option>Jazz</option><option>Acoustic</option><option>Instrumental</option><option>Religi</option><option>Other</option></select></label>
+          <label class="form-field field-full"><span>Judul lagu <b>*</b></span><input name="title" type="text" maxlength="180" placeholder="Contoh: Senja di Kampus" required></label>
+          <label class="form-field"><span>Nama artis</span><input name="artist" type="text" maxlength="180" placeholder="Nama penyanyi / band"></label>
+          <label class="form-field"><span>Genre</span><input name="genre" type="text" maxlength="80" placeholder="Pop, Indie, Rock..."></label>
+          <label class="form-field field-full"><span>File audio <b>*</b></span><input id="audioFile" name="audio" type="file" accept="audio/*" required><small>Format audio yang didukung browser, misalnya MP3 atau M4A.</small></label>
+          <label class="form-field field-full"><span>Cover lagu (opsional)</span><input id="coverFile" name="cover" type="file" accept="image/*"><small>Gunakan gambar JPG, PNG, atau WebP.</small></label>
         </div>
-
-        <div class="file-grid">
-          <label class="file-drop">
-            <span class="file-icon">♫</span>
-            <strong>File Audio</strong>
-            <small>MP3, WAV, OGG, M4A</small>
-            <input name="audio" type="file" accept="audio/*" required>
-            <span class="file-name" id="audioFileName">Belum dipilih</span>
-          </label>
-
-          <label class="file-drop">
-            <span class="file-icon">▧</span>
-            <strong>Cover</strong>
-            <small>JPG, PNG, WEBP</small>
-            <input name="cover" type="file" accept="image/*">
-            <span class="file-name" id="coverFileName">Opsional</span>
-          </label>
-        </div>
-
-        <div class="form-actions">
-          <button type="button" class="ghost-btn" id="cancelUpload">Batal</button>
-          <button type="submit" class="primary-btn">Simpan Lagu</button>
-        </div>
+        <div class="upload-progress" id="uploadProgress" hidden><div class="progress-track"><span id="uploadProgressFill"></span></div><small id="uploadProgressText">Menyiapkan upload...</small></div>
+        <div class="form-actions"><button class="button button-outline" id="cancelUploadBtn" type="button">Batal</button><button class="button button-primary" id="submitUploadBtn" type="submit">Upload ke library <span>↗</span></button></div>
+        <p class="form-notice">Upload hanya tersedia untuk akun admin yang diizinkan.</p>
       </form>
-    </div>
+    </section>
   </div>
-
-  <div class="toast" id="toast"></div>
-
-  <script src="app.js"></script>
+  <div class="toast-region" id="toastRegion" aria-live="polite" aria-atomic="true"></div>
 </body>
 </html>
