@@ -34,6 +34,10 @@
   let currentUser = null;
   let activeGenre = "all";
   let isBusy = false;
+  // Satu sesi pemutaran dihitung sekali; pause/resume tidak menambah statistik.
+  let playSessionId = 0;
+  let countedPlaySessionId = -1;
+  let pendingPlaySessionId = -1;
 
   const escapeHTML = (value) => String(value ?? "").replace(/[&<>"']/g, char => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
@@ -270,6 +274,7 @@
     const index = findSongIndex(id);
     if (index < 0) return;
     currentSongIndex = index;
+    playSessionId += 1;
     const song = songs[index];
     if (!song.audio_url) {
       toast("File audio untuk lagu ini belum tersedia.", "error");
@@ -508,13 +513,23 @@
       els.playPause.textContent = "Ⅱ";
       els.playPause.title = "Jeda";
       const song = songs[currentSongIndex];
-      if (!song || !db) return;
-      const { error } = await db.rpc("increment_song_play_count", { p_song_id: String(song.id) });
+      const sessionId = playSessionId;
+      if (!song || !db || countedPlaySessionId === sessionId || pendingPlaySessionId === sessionId) return;
+
+      // Tandai sebagai pending agar event berulang tidak mengirim RPC ganda.
+      pendingPlaySessionId = sessionId;
+      const songId = String(song.id);
+      const { error } = await db.rpc("increment_song_play_count", { p_song_id: songId });
       if (error) {
+        if (pendingPlaySessionId === sessionId) pendingPlaySessionId = -1;
         console.error("Gagal mencatat pemutaran lagu:", error);
         return;
       }
-      song.play_count = Number(song.play_count || 0) + 1;
+
+      countedPlaySessionId = sessionId;
+      if (pendingPlaySessionId === sessionId) pendingPlaySessionId = -1;
+      const updatedSong = songs.find(item => String(item.id) === songId);
+      if (updatedSong) updatedSong.play_count = Number(updatedSong.play_count || 0) + 1;
       updateStats();
       renderSongs();
     });
