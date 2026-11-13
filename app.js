@@ -202,6 +202,26 @@
     const topGenreEl = $("#topPlayedGenre");
     if (totalPlaysEl) totalPlaysEl.textContent = String(totalPlays);
     if (topGenreEl) topGenreEl.textContent = topGenre && topGenre[1] > 0 ? topGenre[0] : "—";
+    const ranking = $("#topSongsList");
+    const topSongCount = $("#topSongCount");
+    if (topSongCount) topSongCount.textContent = String(songs.filter(song => Number(song.play_count || 0) > 0).length);
+    if (ranking) {
+      const topSongs = [...songs].filter(song => Number(song.play_count || 0) > 0)
+        .sort((a, b) => Number(b.play_count || 0) - Number(a.play_count || 0)).slice(0, 5);
+      const maxPlays = Math.max(1, ...topSongs.map(song => Number(song.play_count || 0)));
+      ranking.innerHTML = topSongs.length ? topSongs.map((song, index) => {
+        const plays = Number(song.play_count || 0);
+        const width = Math.max(4, Math.round((plays / maxPlays) * 100));
+        return `<div class="ranking-item">
+          <span class="ranking-position">${index + 1}</span>
+          <div class="ranking-main">
+            <div class="ranking-copy"><strong>${escapeHTML(song.title || "Tanpa judul")}</strong><span>${escapeHTML(song.artist || "Artis tidak diketahui")}</span></div>
+            <div class="ranking-track"><span style="width:${width}%"></span></div>
+          </div>
+          <strong class="ranking-plays">${plays.toLocaleString("id-ID")} <small>play</small></strong>
+        </div>`;
+      }).join("") : '<p class="ranking-empty">Belum ada lagu yang diputar. Yuk, mulai dengarkan koleksi KOMSI.</p>';
+    }
     els.heroMeta.textContent = `${songs.length} lagu dalam koleksi`;
   }
 
