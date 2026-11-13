@@ -9,9 +9,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=playstats1">
+  <link rel="stylesheet" href="style.css?v=insights1">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script defer src="app.js?v=playstats2"></script>
+  <script defer src="app.js?v=insights1"></script>
 </head>
 <body>
   <div class="app-shell">
@@ -79,6 +79,14 @@
         <div class="stat-card"><span class="stat-icon">◉</span><div><span class="stat-label">TOTAL PEMUTARAN</span><strong id="totalPlays">0</strong></div></div>
         <div class="stat-card"><span class="stat-icon">✦</span><div><span class="stat-label">GENRE TERPOPULER</span><strong id="topPlayedGenre">—</strong></div></div>
         <div class="stat-card"><span class="stat-icon">♬</span><div><span class="stat-label">JUMLAH GENRE</span><strong id="totalGenres">0</strong></div></div>
+      </section>
+
+      <section class="listening-section" aria-label="Statistik lagu terpopuler">
+        <div class="section-heading stats-heading">
+          <div><div class="eyebrow eyebrow-dark">INSIGHT PEMUTARAN</div><h2>Yang paling <span>sering diputar</span></h2><p class="section-subtitle">Peringkat lagu berdasarkan jumlah pemutaran.</p></div>
+          <div class="ranking-total"><strong id="topSongCount">0</strong><span>lagu pernah diputar</span></div>
+        </div>
+        <div class="ranking-panel" id="topSongsList"><p class="ranking-empty">Memuat statistik pemutaran...</p></div>
       </section>
 
       <section class="library-section" id="librarySection">
