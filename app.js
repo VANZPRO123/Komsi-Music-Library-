@@ -296,21 +296,20 @@
     if (!window.confirm(`Hapus lagu "${song.title}" dari library?`)) return;
 
     try {
-      // Minta baris yang terhapus agar respons kosong (misalnya terhalang RLS)
-      // tidak keliru dianggap sebagai penghapusan yang berhasil.
-      const { data: deletedSong, error } = await db.from("songs")
-        .delete()
-        .eq("id", id)
-        .select("id")
-        .maybeSingle();
-
+      // Jangan bergantung pada baris hasil DELETE: policy SELECT dapat
+      // menyembunyikan representation meskipun DELETE berhasil.
+      const { error } = await db.from("songs").delete().eq("id", id);
       if (error) {
         console.error("Delete song database error:", error);
         toast(`Lagu gagal dihapus: ${error.message}`, "error");
         return;
       }
-      if (!deletedSong) {
-        toast("Lagu tidak terhapus. Periksa izin DELETE / policy RLS Supabase.", "error");
+
+      // Verifikasi dari daftar yang dapat dibaca aplikasi setelah penghapusan.
+      await loadSongs();
+      const stillExists = songs.some(item => String(item.id) === String(id));
+      if (stillExists) {
+        toast("Lagu masih ada di database. Periksa izin DELETE / policy RLS Supabase.", "error");
         return;
       }
 
@@ -337,11 +336,10 @@
       await removeStorageFile(song.cover_url, COVERS_BUCKET);
 
       if (cleanupErrors.length) {
-        toast("Data lagu terhapus, tetapi file Storage belum semuanya terhapus. Periksa policy bucket.", "error");
+        toast("Lagu berhasil dihapus, tetapi file audio/cover belum semuanya terhapus dari Storage.", "error");
       } else {
         toast("Lagu berhasil dihapus.", "success");
       }
-      await loadSongs();
     } catch (error) {
       console.error("Unexpected delete error:", error);
       toast(`Terjadi kesalahan saat menghapus lagu: ${error.message || "Coba lagi."}`, "error");
