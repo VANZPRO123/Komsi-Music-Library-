@@ -289,23 +289,63 @@
       return;
     }
     const song = songs.find(item => String(item.id) === String(id));
-    if (!song) return;
-    if (!window.confirm(`Hapus lagu "${song.title}" dari library?`)) return;
-    const { error } = await db.from("songs").delete().eq("id", id);
-    if (error) {
-      toast(`Lagu gagal dihapus: ${error.message}`, "error");
+    if (!song) {
+      toast("Data lagu tidak ditemukan. Muat ulang library.", "error");
       return;
     }
-    if (song.audio_url && song.audio_url.includes(`/storage/v1/object/public/${AUDIO_BUCKET}/`)) {
-      const path = song.audio_url.split(`/storage/v1/object/public/${AUDIO_BUCKET}/`)[1];
-      if (path) await db.storage.from(AUDIO_BUCKET).remove([decodeURIComponent(path)]);
+    if (!window.confirm(`Hapus lagu "${song.title}" dari library?`)) return;
+
+    try {
+      // Minta baris yang terhapus agar respons kosong (misalnya terhalang RLS)
+      // tidak keliru dianggap sebagai penghapusan yang berhasil.
+      const { data: deletedSong, error } = await db.from("songs")
+        .delete()
+        .eq("id", id)
+        .select("id")
+        .maybeSingle();
+
+      if (error) {
+        console.error("Delete song database error:", error);
+        toast(`Lagu gagal dihapus: ${error.message}`, "error");
+        return;
+      }
+      if (!deletedSong) {
+        toast("Lagu tidak terhapus. Periksa izin DELETE / policy RLS Supabase.", "error");
+        return;
+      }
+
+      const cleanupErrors = [];
+      const removeStorageFile = async (url, bucket) => {
+        const marker = `/storage/v1/object/public/${bucket}/`;
+        if (!url || !url.includes(marker)) return;
+        const encodedPath = url.split(marker)[1]?.split(/[?#]/)[0];
+        if (!encodedPath) return;
+        let path;
+        try {
+          path = decodeURIComponent(encodedPath);
+        } catch {
+          path = encodedPath;
+        }
+        const { error: storageError } = await db.storage.from(bucket).remove([path]);
+        if (storageError) {
+          console.error(`Storage cleanup error (${bucket}):`, storageError);
+          cleanupErrors.push(bucket);
+        }
+      };
+
+      await removeStorageFile(song.audio_url, AUDIO_BUCKET);
+      await removeStorageFile(song.cover_url, COVERS_BUCKET);
+
+      if (cleanupErrors.length) {
+        toast("Data lagu terhapus, tetapi file Storage belum semuanya terhapus. Periksa policy bucket.", "error");
+      } else {
+        toast("Lagu berhasil dihapus.", "success");
+      }
+      await loadSongs();
+    } catch (error) {
+      console.error("Unexpected delete error:", error);
+      toast(`Terjadi kesalahan saat menghapus lagu: ${error.message || "Coba lagi."}`, "error");
     }
-    if (song.cover_url && song.cover_url.includes(`/storage/v1/object/public/${COVERS_BUCKET}/`)) {
-      const path = song.cover_url.split(`/storage/v1/object/public/${COVERS_BUCKET}/`)[1];
-      if (path) await db.storage.from(COVERS_BUCKET).remove([decodeURIComponent(path)]);
-    }
-    toast("Lagu berhasil dihapus.", "success");
-    await loadSongs();
   }
 
   function setUploadProgress(percent, message) {
