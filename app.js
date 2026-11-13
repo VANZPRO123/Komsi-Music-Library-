@@ -187,7 +187,18 @@
     const genres = new Set(songs.map(song => clean(song.genre)).filter(Boolean));
     els.totalSongs.textContent = String(songs.length);
     els.totalGenres.textContent = String(genres.size);
-    els.heroMeta.textContent = `${songs.length} lagu${songs.length === 1 ? "" : ""} dalam koleksi`;
+    const totalPlays = songs.reduce((sum, song) => sum + Number(song.play_count || 0), 0);
+    const genrePlays = new Map();
+    songs.forEach(song => {
+      const genre = clean(song.genre) || "Lainnya";
+      genrePlays.set(genre, (genrePlays.get(genre) || 0) + Number(song.play_count || 0));
+    });
+    const topGenre = [...genrePlays.entries()].sort((a, b) => b[1] - a[1])[0];
+    const totalPlaysEl = $("#totalPlays");
+    const topGenreEl = $("#topPlayedGenre");
+    if (totalPlaysEl) totalPlaysEl.textContent = String(totalPlays);
+    if (topGenreEl) topGenreEl.textContent = topGenre && topGenre[1] > 0 ? topGenre[0] : "—";
+    els.heroMeta.textContent = `${songs.length} lagu dalam koleksi`;
   }
 
   function buildGenreChips() {
@@ -493,7 +504,20 @@
       if (els.audio.paused) els.audio.play().catch(() => toast("Lagu gagal diputar.", "error"));
       else els.audio.pause();
     });
-    els.audio.addEventListener("play", () => { els.playPause.textContent = "Ⅱ"; els.playPause.title = "Jeda"; });
+    els.audio.addEventListener("play", async () => {
+      els.playPause.textContent = "Ⅱ";
+      els.playPause.title = "Jeda";
+      const song = songs[currentSongIndex];
+      if (!song || !db) return;
+      const { error } = await db.rpc("increment_song_play_count", { p_song_id: String(song.id) });
+      if (error) {
+        console.error("Gagal mencatat pemutaran lagu:", error);
+        return;
+      }
+      song.play_count = Number(song.play_count || 0) + 1;
+      updateStats();
+      renderSongs();
+    });
     els.audio.addEventListener("pause", () => { els.playPause.textContent = "▶"; els.playPause.title = "Putar"; });
     els.audio.addEventListener("loadedmetadata", () => { els.duration.textContent = formatTime(els.audio.duration); });
     els.audio.addEventListener("timeupdate", () => {
