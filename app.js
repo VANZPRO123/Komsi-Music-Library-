@@ -921,6 +921,10 @@
       setAdminUI();
       renderSongs();
       toast("Berhasil masuk. Favorit dan playlist sudah disinkronkan.", "success");
+      if (pendingCreatePlaylist) {
+        pendingCreatePlaylist = false;
+        openCreatePlaylistModal();
+      }
     } catch (error) {
       toast("Login gagal: " + error.message, "error");
     } finally {
@@ -1058,9 +1062,14 @@
     if (result.error) throw result.error;
   }
   function openCreatePlaylistModal() {
-    if (!currentUser || isAdmin()) {
+    if (!currentUser) {
+      pendingCreatePlaylist = true;
       openMemberAuth();
       toast("Masuk sebagai anggota untuk membuat playlist.");
+      return;
+    }
+    if (isAdmin()) {
+      toast("Playlist pribadi hanya tersedia untuk akun anggota. Keluar dari akun admin lalu masuk sebagai anggota.", "error");
       return;
     }
     const modal = $("#createPlaylistModal");
