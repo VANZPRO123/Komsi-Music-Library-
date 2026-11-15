@@ -243,33 +243,6 @@
     els.heroMeta.textContent = `${songs.length} lagu dalam koleksi`;
   }
 
-  function loadFavorites() {
-    try {
-      const saved = JSON.parse(localStorage.getItem("komsiMusicFavorites") || "[]");
-      favoriteIds = new Set(Array.isArray(saved) ? saved.map(String) : []);
-    } catch (error) {
-      console.warn("Favorit lokal tidak dapat dibaca:", error);
-      favoriteIds = new Set();
-    }
-  }
-
-  function saveFavorites() {
-    try {
-      localStorage.setItem("komsiMusicFavorites", JSON.stringify([...favoriteIds]));
-    } catch (error) {
-      toast("Favorit tidak dapat disimpan di perangkat ini.", "error");
-    }
-  }
-
-  function toggleFavorite(id) {
-    const key = String(id);
-    if (favoriteIds.has(key)) favoriteIds.delete(key);
-    else favoriteIds.add(key);
-    saveFavorites();
-    renderSongs();
-    toast(favoriteIds.has(key) ? "Ditambahkan ke favorit." : "Dihapus dari favorit.", "success");
-  }
-
   function updateActiveNavigation() {
     const activeId = activeView === "favorites" ? "favoritesNav" : activeView === "all" ? "allSongsNav" : activeView === "playlist" ? "" : "homeNav";
     ["#homeNav", "#allSongsNav", "#favoritesNav"].forEach(selector => {
@@ -277,25 +250,6 @@
       if (button) button.classList.toggle("active", button.id === activeId);
     });
     $("#playlistNavList .playlist-nav-item, #mobilePlaylistNavList .playlist-nav-item").forEach(button => button.classList.toggle("active", button.dataset.playlistId === activePlaylistId && activeView === "playlist"));
-  }
-
-  function loadPlaylists() {
-    try {
-      const saved = JSON.parse(localStorage.getItem("komsiMusicPlaylists") || "[]");
-      playlists = Array.isArray(saved) ? saved.filter(item => item && typeof item.id === "string" && typeof item.name === "string" && Array.isArray(item.songIds)).map(item => ({ id: item.id, name: item.name.slice(0, 50), songIds: [...new Set(item.songIds.map(String))] })) : [];
-    } catch (error) {
-      console.warn("Playlist lokal tidak dapat dibaca:", error);
-      playlists = [];
-    }
-    renderPlaylistNavigation();
-  }
-
-  function savePlaylists() {
-    try {
-      localStorage.setItem("komsiMusicPlaylists", JSON.stringify(playlists));
-    } catch (error) {
-      toast("Playlist tidak dapat disimpan di perangkat ini.", "error");
-    }
   }
 
   function renderPlaylistNavigation() {
@@ -311,61 +265,6 @@
     if (mobileContainer) mobileContainer.innerHTML = markup;
     updateActiveNavigation();
     if (typeof renderPlaylistDetail === "function") renderPlaylistDetail();
-  }
-
-  function createPlaylist() {
-    const name = clean(window.prompt("Nama playlist baru:"));
-    if (!name) return;
-    if (playlists.some(item => item.name.toLocaleLowerCase("id") === name.toLocaleLowerCase("id"))) {
-      toast("Nama playlist tersebut sudah digunakan.", "error");
-      return;
-    }
-    playlists.unshift({ id: `pl-${Date.now()}-${Math.random().toString(36).slice(2,7)}`, name: name.slice(0,50), songIds: [] });
-    savePlaylists();
-    renderPlaylistNavigation();
-    toast("Playlist berhasil dibuat.", "success");
-  }
-
-  function addSongToPlaylist(songId) {
-    if (!playlists.length) {
-      const create = window.confirm("Kamu belum punya playlist. Buat playlist sekarang?");
-      if (!create) return;
-      createPlaylist();
-      if (!playlists.length) return;
-    }
-    const choices = playlists.map((list, index) => `${index + 1}. ${list.name}`).join("\n");
-    const answer = window.prompt(`Tambahkan lagu ke playlist nomor berapa?\n\n${choices}`, "1");
-    if (answer === null) return;
-    const index = Number(answer) - 1;
-    const list = Number.isInteger(index) ? playlists[index] : null;
-    if (!list) { toast("Nomor playlist tidak valid.", "error"); return; }
-    const key = String(songId);
-    if (list.songIds.includes(key)) { toast("Lagu sudah ada di playlist ini."); return; }
-    list.songIds.push(key);
-    savePlaylists();
-    renderPlaylistNavigation();
-    toast(`Lagu ditambahkan ke playlist "${list.name}".`, "success");
-  }
-
-  function removeSongFromPlaylist(songId) {
-    const list = playlists.find(item => item.id === activePlaylistId);
-    if (!list) return;
-    list.songIds = list.songIds.filter(id => id !== String(songId));
-    savePlaylists();
-    renderPlaylistNavigation();
-    renderSongs();
-    toast("Lagu dihapus dari playlist.");
-  }
-
-  function deletePlaylist(id) {
-    const list = playlists.find(item => item.id === id);
-    if (!list || !window.confirm(`Hapus playlist "${list.name}"? Lagu aslinya tidak akan dihapus.`)) return;
-    playlists = playlists.filter(item => item.id !== id);
-    if (activePlaylistId === id) { activePlaylistId = null; activeView = "discover"; }
-    savePlaylists();
-    renderPlaylistNavigation();
-    renderSongs();
-    toast("Playlist dihapus.");
   }
 
   function buildGenreChips() {
