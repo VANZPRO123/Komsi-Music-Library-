@@ -928,7 +928,10 @@
       const result = await db.auth.signUp({
         email: email,
         password: password,
-        options: { data: { display_name: name } }
+        options: {
+          data: { display_name: name },
+          emailRedirectTo: "https://vanzpro123.github.io/Komsi-Music-Library-/"
+        }
       });
       if (result.error) throw result.error;
       form.reset();
