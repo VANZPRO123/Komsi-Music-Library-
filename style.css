@@ -313,3 +313,27 @@ body{
 .ranking-plays small{color:#96929e;font-size:10px;font-weight:500}
 .ranking-empty{margin:0;padding:18px 8px;text-align:center;color:#8a8792;font-size:13px}
 @media(max-width:640px){.listening-section{padding:21px 17px;border-radius:17px}.stats-heading{align-items:flex-start;gap:12px}.ranking-total{padding-top:4px}.ranking-copy{flex-direction:column;gap:2px}.ranking-item{grid-template-columns:25px minmax(0,1fr) auto;gap:9px}}
+
+
+/* ===== FAVORITES ===== */
+.favorite-song{
+  display:inline-grid;
+  place-items:center;
+  width:27px;
+  height:27px;
+  flex:0 0 27px;
+  border:1px solid #e9e5f4;
+  border-radius:9px;
+  background:#fff;
+  color:#817b91;
+  font-size:16px;
+  line-height:1;
+  cursor:pointer;
+  transition:background .18s ease,color .18s ease,border-color .18s ease,transform .18s ease;
+}
+.favorite-song:hover{transform:translateY(-1px);border-color:#efb5c9;color:#d94e82}
+.favorite-song.is-favorite{background:#fff0f5;border-color:#ffd6e4;color:#e3487d}
+.side-nav .nav-item#favoritesNav .nav-icon{font-size:17px}
+@media(max-width:600px){
+  .favorite-song{width:25px;height:25px;flex-basis:25px}
+}
