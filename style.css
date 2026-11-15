@@ -357,3 +357,14 @@ body{
 .add-playlist-song{display:inline-grid;place-items:center;width:27px;height:27px;flex:0 0 27px;border:1px solid #e8e5f1;border-radius:9px;background:#fff;color:#7560bd;font-size:17px;line-height:1;cursor:pointer}
 .add-playlist-song:hover{border-color:#cfc3ff;background:#f5f2ff;color:#674bd0}
 @media(max-width:850px){.playlist-sidebar{margin-top:12px;padding-top:12px}.playlist-nav-list{grid-template-columns:repeat(2,minmax(0,1fr))}.playlist-nav-row{min-width:0}.playlist-nav-item{padding:8px 6px}.playlist-delete{flex:0 0 22px}}
+
+/* Member authentication */
+.auth-tabs{display:flex;gap:8px;margin:0 0 22px;padding:4px;background:#f1f1f4;border-radius:12px}
+.auth-tab{flex:1;border:0;background:transparent;border-radius:9px;padding:11px 14px;font:inherit;font-weight:700;color:#777;cursor:pointer}
+.auth-tab.active{background:#fff;color:#17171d;box-shadow:0 2px 8px rgba(0,0,0,.07)}
+.member-auth-form{display:grid;gap:14px}
+.member-auth-form[hidden]{display:none}
+.auth-submit{width:100%;justify-content:center;margin-top:5px}
+.auth-notice{margin-top:18px}
+.member-auth-card{max-width:480px}
+@media(max-width:700px){#memberAuthBtn,#adminLoginBtn{padding:9px 10px;font-size:12px}}
