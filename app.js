@@ -723,7 +723,7 @@
       $("#librarySection").scrollIntoView({ behavior: "smooth" });
     });
     $("#createPlaylistBtn").addEventListener("click", openCreatePlaylistModal);
-    $("#playlistPlayBtn").addEventListener("click", () => playActivePlaylist(false));
+    $("#playlistPlayBtn").addEventListener("click", playActivePlaylist);
     $("#playlistShuffleBtn").addEventListener("click", () => { shufflePlaylist = !shufflePlaylist; renderPlaylistDetail(); toast(shufflePlaylist ? "Mode acak aktif." : "Mode acak nonaktif."); });
     $("#playlistRepeatBtn").addEventListener("click", () => { repeatPlaylist = !repeatPlaylist; renderPlaylistDetail(); toast(repeatPlaylist ? "Ulangi playlist aktif." : "Ulangi playlist nonaktif."); });
     $("#playlistRenameBtn").addEventListener("click", renameActivePlaylist);
@@ -1039,12 +1039,13 @@
     const old = list.songIds.slice(); list.songIds = [];
     try { await persistPlaylist(list); renderPlaylistNavigation(); renderSongs(); toast("Playlist dikosongkan."); } catch (error) { list.songIds = old; toast("Gagal mengosongkan playlist: " + error.message, "error"); }
   }
-  function playActivePlaylist(shuffle) {
-    const list = playlists.find(item => item.id === activePlaylistId); if (!list) return;
+  function playActivePlaylist() {
+    const list = playlists.find(item => item.id === activePlaylistId);
+    if (!list) { toast("Pilih playlist terlebih dahulu."); return; }
     const ids = list.songIds.filter(id => songs.some(song => String(song.id) === String(id)));
     if (!ids.length) { toast("Playlist belum memiliki lagu."); return; }
-    shufflePlaylist = Boolean(shuffle); renderPlaylistDetail();
-    const id = shufflePlaylist ? ids[Math.floor(Math.random() * ids.length)] : ids[0]; playSongById(id);
+    const id = shufflePlaylist ? ids[Math.floor(Math.random() * ids.length)] : ids[0];
+    playSongById(id);
   }
   async function persistPlaylist(list) {
     const result = await db.from("user_playlists").upsert({
@@ -1188,20 +1189,24 @@
     }
   }
   async function deletePlaylist(id) {
-    const list = playlists.find(function(item) { return item.id === id; });
-    if (!list || !window.confirm("Hapus playlist " + list.name + "? Lagu aslinya tetap aman.")) return;
-    const result = await db.from("user_playlists").delete().eq("id", id).eq("user_id", currentUser.id);
-    if (result.error) {
-      toast("Gagal menghapus playlist: " + result.error.message, "error");
-      return;
+    const list = playlists.find(item => item.id === id);
+    if (!list || !currentUser || isAdmin()) return;
+    if (!window.confirm("Hapus playlist " + list.name + "? Lagu aslinya tetap aman.")) return;
+    try {
+      const { error } = await db.from("user_playlists").delete().eq("id", id).eq("user_id", currentUser.id);
+      if (error) throw error;
+      playlists = playlists.filter(item => item.id !== id);
+      if (activePlaylistId === id) {
+        activePlaylistId = null;
+        activeView = "discover";
+      }
+      renderPlaylistNavigation();
+      renderSongs();
+      toast("Playlist berhasil dihapus.", "success");
+    } catch (error) {
+      console.error("Delete playlist failed:", error);
+      toast("Gagal menghapus playlist: " + (error.message || "Kesalahan database"), "error");
     }
-    playlists = playlists.filter(function(item) { return item.id !== id; });
-    if (activePlaylistId === id) {
-      activePlaylistId = null;
-      activeView = "discover";
-    }
-    renderPlaylistNavigation();
-    renderSongs();
   }
 
   document.addEventListener("DOMContentLoaded", init);
