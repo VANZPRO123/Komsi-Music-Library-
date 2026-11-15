@@ -810,5 +810,227 @@
     }
   }
 
+
+  function openMemberAuth() {
+    els.memberAuthModal.hidden = false;
+    document.body.style.overflow = "hidden";
+    setMemberAuthMode(false);
+  }
+  function closeMemberAuth() {
+    els.memberAuthModal.hidden = true;
+    document.body.style.overflow = "";
+  }
+  function setMemberAuthMode(signup) {
+    $("#memberSignInForm").hidden = signup;
+    $("#memberSignUpForm").hidden = !signup;
+    $("#memberSignInTab").classList.toggle("active", !signup);
+    $("#memberSignUpTab").classList.toggle("active", signup);
+  }
+  async function handleMemberSignIn(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const email = clean(form.elements.email.value).toLowerCase();
+    if (email === ADMIN_EMAIL.toLowerCase()) {
+      toast("Gunakan tombol Login Admin.", "error");
+      return;
+    }
+    const button = form.querySelector('button[type="submit"]');
+    button.disabled = true;
+    try {
+      const result = await db.auth.signInWithPassword({ email: email, password: form.elements.password.value });
+      if (result.error) throw result.error;
+      closeMemberAuth();
+      form.reset();
+      await loadMemberData();
+      setAdminUI();
+      renderSongs();
+      toast("Berhasil masuk. Favorit dan playlist sudah disinkronkan.", "success");
+    } catch (error) {
+      toast("Login gagal: " + error.message, "error");
+    } finally {
+      button.disabled = false;
+    }
+  }
+  async function handleMemberSignUp(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const name = clean(form.elements.name.value);
+    const email = clean(form.elements.email.value).toLowerCase();
+    const password = form.elements.password.value;
+    if (email === ADMIN_EMAIL.toLowerCase()) {
+      toast("Email admin tidak dapat dipakai untuk daftar anggota.", "error");
+      return;
+    }
+    if (password.length < 6) {
+      toast("Password minimal 6 karakter.", "error");
+      return;
+    }
+    if (password !== form.elements.confirmPassword.value) {
+      toast("Konfirmasi password tidak sama.", "error");
+      return;
+    }
+    const button = form.querySelector('button[type="submit"]');
+    button.disabled = true;
+    try {
+      const result = await db.auth.signUp({
+        email: email,
+        password: password,
+        options: { data: { display_name: name } }
+      });
+      if (result.error) throw result.error;
+      form.reset();
+      if (result.data.session) {
+        closeMemberAuth();
+        await loadMemberData();
+        setAdminUI();
+        renderSongs();
+        toast("Akun anggota berhasil dibuat. Selamat datang!", "success");
+      } else {
+        setMemberAuthMode(false);
+        toast("Pendaftaran berhasil. Verifikasi email terlebih dahulu, lalu masuk.", "success");
+      }
+    } catch (error) {
+      toast("Pendaftaran gagal: " + error.message, "error");
+    } finally {
+      button.disabled = false;
+    }
+  }
+  async function loadMemberData() {
+    if (!currentUser || isAdmin()) {
+      favoriteIds = new Set();
+      playlists = [];
+      renderPlaylistNavigation();
+      return;
+    }
+    const results = await Promise.all([
+      db.from("user_favorites").select("song_id").eq("user_id", currentUser.id),
+      db.from("user_playlists").select("id,name,song_ids").eq("user_id", currentUser.id).order("updated_at", { ascending: false })
+    ]);
+    if (results[0].error) throw results[0].error;
+    if (results[1].error) throw results[1].error;
+    favoriteIds = new Set((results[0].data || []).map(function(row) { return String(row.song_id); }));
+    playlists = (results[1].data || []).map(function(row) {
+      return { id: String(row.id), name: row.name, songIds: (row.song_ids || []).map(String) };
+    });
+    renderPlaylistNavigation();
+  }
+  async function toggleFavorite(id) {
+    if (!currentUser || isAdmin()) {
+      openMemberAuth();
+      toast("Masuk sebagai anggota untuk menyimpan favorit.");
+      return;
+    }
+    const key = String(id);
+    const wasSaved = favoriteIds.has(key);
+    const result = wasSaved
+      ? await db.from("user_favorites").delete().eq("user_id", currentUser.id).eq("song_id", key)
+      : await db.from("user_favorites").insert({ user_id: currentUser.id, song_id: key });
+    if (result.error) {
+      toast("Gagal menyimpan favorit: " + result.error.message, "error");
+      return;
+    }
+    if (wasSaved) favoriteIds.delete(key);
+    else favoriteIds.add(key);
+    renderSongs();
+    toast(wasSaved ? "Dihapus dari favorit." : "Ditambahkan ke favorit.", "success");
+  }
+  async function persistPlaylist(list) {
+    const result = await db.from("user_playlists").upsert({
+      id: list.id,
+      user_id: currentUser.id,
+      name: list.name,
+      song_ids: list.songIds,
+      updated_at: new Date().toISOString()
+    });
+    if (result.error) throw result.error;
+  }
+  async function createPlaylist() {
+    if (!currentUser || isAdmin()) {
+      openMemberAuth();
+      toast("Masuk sebagai anggota untuk membuat playlist.");
+      return;
+    }
+    const name = clean(window.prompt("Nama playlist baru:")).slice(0, 50);
+    if (!name) return;
+    if (playlists.some(function(item) { return item.name.toLowerCase() === name.toLowerCase(); })) {
+      toast("Nama playlist sudah digunakan.", "error");
+      return;
+    }
+    const result = await db.from("user_playlists")
+      .insert({ user_id: currentUser.id, name: name, song_ids: [] })
+      .select("id,name,song_ids").single();
+    if (result.error) {
+      toast("Playlist gagal dibuat: " + result.error.message, "error");
+      return;
+    }
+    playlists.unshift({ id: String(result.data.id), name: result.data.name, songIds: [] });
+    renderPlaylistNavigation();
+    toast("Playlist berhasil dibuat dan tersimpan.", "success");
+  }
+  async function addSongToPlaylist(songId) {
+    if (!currentUser || isAdmin()) {
+      openMemberAuth();
+      toast("Masuk sebagai anggota untuk mengelola playlist.");
+      return;
+    }
+    if (!playlists.length) {
+      if (!window.confirm("Belum ada playlist. Buat sekarang?")) return;
+      await createPlaylist();
+      if (!playlists.length) return;
+    }
+    const options = playlists.map(function(item, index) { return (index + 1) + ". " + item.name; }).join("\n");
+    const answer = window.prompt("Pilih nomor playlist:\n\n" + options, "1");
+    if (answer === null) return;
+    const list = playlists[Number(answer) - 1];
+    if (!list) {
+      toast("Nomor playlist tidak valid.", "error");
+      return;
+    }
+    const key = String(songId);
+    if (list.songIds.includes(key)) {
+      toast("Lagu sudah ada di playlist.");
+      return;
+    }
+    list.songIds.push(key);
+    try {
+      await persistPlaylist(list);
+      renderPlaylistNavigation();
+      toast("Lagu ditambahkan ke playlist.", "success");
+    } catch (error) {
+      list.songIds = list.songIds.filter(function(id) { return id !== key; });
+      toast("Gagal menyimpan playlist: " + error.message, "error");
+    }
+  }
+  async function removeSongFromPlaylist(songId) {
+    const list = playlists.find(function(item) { return item.id === activePlaylistId; });
+    if (!list) return;
+    const previous = list.songIds.slice();
+    list.songIds = list.songIds.filter(function(id) { return id !== String(songId); });
+    try {
+      await persistPlaylist(list);
+      renderPlaylistNavigation();
+      renderSongs();
+    } catch (error) {
+      list.songIds = previous;
+      toast("Gagal memperbarui playlist: " + error.message, "error");
+    }
+  }
+  async function deletePlaylist(id) {
+    const list = playlists.find(function(item) { return item.id === id; });
+    if (!list || !window.confirm("Hapus playlist " + list.name + "? Lagu aslinya tetap aman.")) return;
+    const result = await db.from("user_playlists").delete().eq("id", id).eq("user_id", currentUser.id);
+    if (result.error) {
+      toast("Gagal menghapus playlist: " + result.error.message, "error");
+      return;
+    }
+    playlists = playlists.filter(function(item) { return item.id !== id; });
+    if (activePlaylistId === id) {
+      activePlaylistId = null;
+      activeView = "discover";
+    }
+    renderPlaylistNavigation();
+    renderSongs();
+  }
+
   document.addEventListener("DOMContentLoaded", init);
 })();
