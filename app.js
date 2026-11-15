@@ -269,7 +269,7 @@
       const button = $(selector);
       if (button) button.classList.toggle("active", button.id === activeId);
     });
-    $$("#playlistNavList .playlist-nav-item").forEach(button => button.classList.toggle("active", button.dataset.playlistId === activePlaylistId && activeView === "playlist"));
+    $("#playlistNavList .playlist-nav-item, #mobilePlaylistNavList .playlist-nav-item").forEach(button => button.classList.toggle("active", button.dataset.playlistId === activePlaylistId && activeView === "playlist"));
   }
 
   function loadPlaylists() {
@@ -1123,38 +1123,54 @@
       if (button) { button.disabled = false; button.textContent = "Buat playlist"; }
     }
   }
+  function choosePlaylistForSong() {
+    return new Promise(resolve => {
+      const backdrop = document.createElement("div");
+      backdrop.className = "playlist-dialog-backdrop";
+      const options = playlists.map(item => '<option value="' + escapeHTML(item.id) + '">' + escapeHTML(item.name) + ' (' + item.songIds.length + ' lagu)</option>').join("");
+      backdrop.innerHTML = '<form class="playlist-dialog" role="dialog" aria-modal="true" aria-label="Pilih playlist">' +
+        '<div class="playlist-dialog-kicker">KOMSI MUSIC LIBRARY</div><h3>Tambahkan ke playlist</h3>' +
+        '<label>Pilih playlist tujuan<select class="playlist-dialog-input" name="playlistId" required>' + options + '</select></label>' +
+        '<div class="playlist-dialog-actions"><button type="button" class="button button-outline" data-cancel>Batal</button><button type="submit" class="button button-primary">Tambahkan lagu</button></div></form>';
+      const finish = value => { backdrop.remove(); resolve(value); };
+      backdrop.addEventListener("click", event => { if (event.target === backdrop) finish(null); });
+      backdrop.querySelector("[data-cancel]").addEventListener("click", () => finish(null));
+      backdrop.querySelector("form").addEventListener("submit", event => {
+        event.preventDefault();
+        finish(backdrop.querySelector("select").value || null);
+      });
+      document.body.appendChild(backdrop);
+      backdrop.querySelector("select").focus();
+    });
+  }
+
   async function addSongToPlaylist(songId) {
     if (!currentUser || isAdmin()) {
       openMemberAuth();
-      toast("Masuk sebagai anggota untuk mengelola playlist.");
+      toast("Login sebagai anggota diperlukan untuk menambahkan lagu.");
       return;
     }
     if (!playlists.length) {
-      if (!window.confirm("Belum ada playlist. Buat sekarang?")) return;
-      await createPlaylist();
-      if (!playlists.length) return;
-    }
-    const options = playlists.map(function(item, index) { return (index + 1) + ". " + item.name; }).join("\n");
-    const answer = window.prompt("Pilih nomor playlist:\n\n" + options, "1");
-    if (answer === null) return;
-    const list = playlists[Number(answer) - 1];
-    if (!list) {
-      toast("Nomor playlist tidak valid.", "error");
+      const shouldCreate = window.confirm("Kamu belum memiliki playlist. Buat playlist sekarang?");
+      if (shouldCreate) openCreatePlaylistModal();
       return;
     }
+    const selectedId = await choosePlaylistForSong();
+    if (!selectedId) return;
+    const list = playlists.find(item => item.id === selectedId);
+    if (!list) { toast("Playlist tidak ditemukan. Muat ulang halaman.", "error"); return; }
     const key = String(songId);
-    if (list.songIds.includes(key)) {
-      toast("Lagu sudah ada di playlist.");
-      return;
-    }
+    if (list.songIds.includes(key)) { toast("Lagu sudah ada di playlist ini."); return; }
     list.songIds.push(key);
     try {
       await persistPlaylist(list);
       renderPlaylistNavigation();
-      toast("Lagu ditambahkan ke playlist.", "success");
+      if (activeView === "playlist" && activePlaylistId === list.id) renderSongs();
+      toast('Lagu berhasil ditambahkan ke "' + list.name + '".', "success");
     } catch (error) {
-      list.songIds = list.songIds.filter(function(id) { return id !== key; });
-      toast("Gagal menyimpan playlist: " + error.message, "error");
+      list.songIds = list.songIds.filter(id => id !== key);
+      console.error("Add song to playlist failed:", error);
+      toast("Gagal menambahkan lagu: " + (error.message || "Kesalahan database"), "error");
     }
   }
   async function removeSongFromPlaylist(songId) {
