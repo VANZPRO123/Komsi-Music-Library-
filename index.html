@@ -182,6 +182,19 @@
       </form>
     </section>
   </div>
+  <div class="modal-backdrop" id="createPlaylistModal" hidden>
+    <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="createPlaylistTitle">
+      <div class="modal-header">
+        <div><div class="eyebrow eyebrow-dark">KOLEKSI MUSIK PRIBADI</div><h2 id="createPlaylistTitle">Buat <span>playlist</span></h2><p>Beri nama playlist untuk mengumpulkan lagu pilihanmu.</p></div>
+        <button class="modal-close" id="closeCreatePlaylistBtn" type="button" aria-label="Tutup">×</button>
+      </div>
+      <form id="createPlaylistForm">
+        <label class="form-field" for="newPlaylistName"><span>Nama playlist</span><input id="newPlaylistName" name="playlistName" type="text" maxlength="50" placeholder="Contoh: Lagu Favoritku" autocomplete="off" required></label>
+        <p class="form-notice">Playlist ini tersimpan di akun anggota dan bisa dibuka kembali setelah login.</p>
+        <div class="form-actions"><button class="button button-outline" id="cancelCreatePlaylistBtn" type="button">Batal</button><button class="button button-primary" id="saveNewPlaylistBtn" type="submit">Buat playlist</button></div>
+      </form>
+    </section>
+  </div>
   <div class="toast-region" id="toastRegion" aria-live="polite" aria-atomic="true"></div>
 </body>
 </html>
