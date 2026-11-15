@@ -337,3 +337,23 @@ body{
 @media(max-width:600px){
   .favorite-song{width:25px;height:25px;flex-basis:25px}
 }
+
+
+/* ===== PERSONAL PLAYLISTS ===== */
+.playlist-sidebar{margin:24px 0 0;padding-top:18px;border-top:1px solid rgba(130,120,160,.16)}
+.playlist-sidebar-heading{display:flex;align-items:center;justify-content:space-between;padding:0 9px 10px;color:#918b9e;font-size:10px;font-weight:800;letter-spacing:.12em}
+.playlist-sidebar-heading button{display:grid;place-items:center;width:25px;height:25px;border:0;border-radius:8px;background:#eeeaff;color:#7256dc;font-size:19px;line-height:1;cursor:pointer}
+.playlist-nav-list{display:grid;gap:4px}
+.playlist-nav-empty{margin:0;padding:5px 9px;color:#a09baa;font-size:11px}
+.playlist-nav-row{display:flex;align-items:center;gap:3px;min-width:0}
+.playlist-nav-item{display:flex;align-items:center;gap:9px;flex:1;min-width:0;padding:9px;border:0;border-radius:10px;background:transparent;color:#6f6a79;text-align:left;font:inherit;font-size:12px;cursor:pointer}
+.playlist-nav-item>span:nth-child(2){overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.playlist-nav-icon{display:grid;place-items:center;width:23px;height:23px;flex:0 0 23px;border-radius:7px;background:#f0edfa;color:#7659d8}
+.playlist-nav-item small{margin-left:auto;color:#aaa4b4;font-size:10px}
+.playlist-nav-item:hover,.playlist-nav-item.active{background:#f0edff;color:#674bd0}
+.playlist-delete{width:23px;height:25px;border:0;border-radius:7px;background:transparent;color:#aaa3b2;font-size:17px;cursor:pointer;opacity:.55}
+.playlist-nav-row:hover .playlist-delete{opacity:1}
+.playlist-delete:hover{background:#fff0f1;color:#d65b69}
+.add-playlist-song{display:inline-grid;place-items:center;width:27px;height:27px;flex:0 0 27px;border:1px solid #e8e5f1;border-radius:9px;background:#fff;color:#7560bd;font-size:17px;line-height:1;cursor:pointer}
+.add-playlist-song:hover{border-color:#cfc3ff;background:#f5f2ff;color:#674bd0}
+@media(max-width:850px){.playlist-sidebar{margin-top:12px;padding-top:12px}.playlist-nav-list{grid-template-columns:repeat(2,minmax(0,1fr))}.playlist-nav-row{min-width:0}.playlist-nav-item{padding:8px 6px}.playlist-delete{flex:0 0 22px}}
