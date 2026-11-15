@@ -104,8 +104,11 @@
   }
 
   async function loginAdmin() {
-    if (!db) {
-      toast("Koneksi Supabase belum siap. Coba muat ulang halaman.", "error");
+    let client;
+    try {
+      client = await getSupabaseClient();
+    } catch (error) {
+      toast("Koneksi Supabase gagal: " + (error.message || "Periksa koneksi internet."), "error");
       return false;
     }
     const emailInput = window.prompt("Email admin Supabase:");
@@ -118,13 +121,13 @@
     const password = window.prompt("Password akun Supabase admin:");
     if (!password) return false;
 
-    const { data, error } = await db.auth.signInWithPassword({ email, password });
+    const { data, error } = await client.auth.signInWithPassword({ email, password });
     if (error) {
       toast(`Login gagal: ${error.message}`, "error");
       return false;
     }
     if (!data.user || data.user.email?.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
-      await db.auth.signOut();
+      await client.auth.signOut();
       currentUser = null;
       setAdminUI();
       toast("Akun ini tidak memiliki akses admin.", "error");
@@ -733,11 +736,23 @@
 
   async function getSupabaseClient() {
     if (db && db.auth) return db;
-    if (supabaseReady) {
+    if (!supabaseReady) {
+      supabaseReady = (async () => {
+        await ensureSupabaseLibrary();
+        db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+          auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+        });
+        return db;
+      })();
+    }
+    try {
       const client = await supabaseReady;
       if (client && client.auth) return client;
+      throw new Error("Supabase client tidak berhasil dibuat.");
+    } catch (error) {
+      supabaseReady = null;
+      throw error;
     }
-    throw new Error("Koneksi Supabase belum tersedia. Muat ulang halaman dan periksa koneksi internet.");
   }
 
   async function init() {
