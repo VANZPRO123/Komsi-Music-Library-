@@ -817,13 +817,25 @@
     window.addEventListener("offline", () => setConnection("Offline", false));
   }
 
+  async function ensureSupabaseLibrary() {
+    if (window.supabase && typeof window.supabase.createClient === "function") return;
+    await new Promise((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = "https://unpkg.com/@supabase/supabase-js@2";
+      script.async = true;
+      script.onload = () => window.supabase && typeof window.supabase.createClient === "function"
+        ? resolve()
+        : reject(new Error("Library Supabase JS tidak menyediakan createClient."));
+      script.onerror = () => reject(new Error("Gagal memuat Supabase JS dari CDN. Periksa koneksi internet atau pemblokir konten."));
+      document.head.appendChild(script);
+    });
+  }
+
   async function init() {
     $("#yearText").textContent = String(new Date().getFullYear());
     bindEvents(); updateActiveNavigation(); setAdminUI();
-    if (!window.supabase || typeof window.supabase.createClient !== "function") {
-      showState("error"); els.errorMessage.textContent = "Library Supabase JS belum termuat."; setConnection("Tidak terhubung", false); return;
-    }
     try {
+      await ensureSupabaseLibrary();
       db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
       const { data, error } = await db.auth.getSession();
       if (error) console.warn("Get session:", error.message);
@@ -919,6 +931,7 @@
     const button = form.querySelector('button[type="submit"]');
     button.disabled = true;
     try {
+      if (!db || !db.auth) throw new Error("Koneksi Supabase belum siap. Muat ulang halaman dan coba lagi.");
       const result = await db.auth.signInWithPassword({ email: email, password: form.elements.password.value });
       if (result.error) throw result.error;
       closeMemberAuth();
@@ -958,6 +971,7 @@
     const button = form.querySelector('button[type="submit"]');
     button.disabled = true;
     try {
+      if (!db || !db.auth) throw new Error("Koneksi Supabase belum siap. Muat ulang halaman dan coba lagi.");
       const result = await db.auth.signUp({
         email: email,
         password: password,
