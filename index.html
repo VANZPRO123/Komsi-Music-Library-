@@ -9,9 +9,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=favorites1">
+  <link rel="stylesheet" href="style.css?v=playlists1">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script defer src="app.js?v=favorites1"></script>
+  <script defer src="app.js?v=playlists1"></script>
 </head>
 <body>
   <div class="app-shell">
@@ -26,6 +26,10 @@
         <button class="nav-item" id="allSongsNav" type="button"><span class="nav-icon">♫</span> Semua Lagu</button>
         <button class="nav-item" id="favoritesNav" type="button"><span class="nav-icon">♡</span> Favorit</button>
       </nav>
+      <div class="playlist-sidebar">
+        <div class="playlist-sidebar-heading"><span>PLAYLIST PRIBADI</span><button id="createPlaylistBtn" type="button" aria-label="Buat playlist" title="Buat playlist">＋</button></div>
+        <div id="playlistNavList" class="playlist-nav-list"><p class="playlist-nav-empty">Belum ada playlist</p></div>
+      </div>
       <div class="sidebar-bottom">
         <div class="sidebar-note">
           <span class="note-icon">✦</span>
