@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101014">
+  <title>Konfirmasi Email — KOMSI Music Library</title>
+  <style>
+    *{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;background:#101014;color:#f5f5f7;font-family:Arial,sans-serif}
+    main{width:min(100%,440px);padding:36px 28px;border:1px solid #303039;border-radius:22px;background:#19191f;text-align:center;box-shadow:0 24px 80px #0006}
+    .mark{width:54px;height:54px;margin:0 auto 20px;border-radius:16px;display:grid;place-items:center;background:#e9c46a;color:#171717;font-size:27px;font-weight:800}
+    h1{font-size:23px;margin:0 0 12px}p{color:#b8b8c2;line-height:1.65;margin:0}
+    #status{margin-top:18px;font-size:14px;color:#e9c46a}a{display:inline-block;margin-top:24px;padding:12px 18px;border-radius:10px;background:#e9c46a;color:#171717;text-decoration:none;font-weight:700}
+  </style>
+</head>
+<body>
+  <main>
+    <div class="mark">K</div>
+    <h1 id="title">Memverifikasi email...</h1>
+    <p id="message">Mohon tunggu sebentar. Kami sedang mengaktifkan akun KOMSI Music Library kamu.</p>
+    <div id="status">Menghubungkan ke Supabase</div>
+    <a id="home" href="../" hidden>Kembali ke KOMSI Music Library</a>
+  </main>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    (async function () {
+      const SUPABASE_URL = "https://dqbzjzsteuaraqfsatpb.supabase.co";
+      const SUPABASE_KEY = "sb_publishable_b3ft4ELVXRGVtOayaRd8YA_QxVl5E1p";
+      const HOME_URL = "https://vanzpro123.github.io/Komsi-Music-Library-/";
+      const title = document.getElementById("title");
+      const message = document.getElementById("message");
+      const status = document.getElementById("status");
+      const home = document.getElementById("home");
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const tokenHash = params.get("token_hash");
+        const type = params.get("type") || "email";
+        if (!tokenHash) throw new Error("Token konfirmasi tidak ditemukan. Gunakan tautan konfirmasi terbaru dari email.");
+        if (!window.supabase || !window.supabase.createClient) throw new Error("Layanan verifikasi belum termuat. Periksa koneksi internet lalu coba lagi.");
+        const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+          auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
+        });
+        const { error } = await client.auth.verifyOtp({ token_hash: tokenHash, type: type });
+        if (error) throw error;
+        title.textContent = "Email berhasil dikonfirmasi!";
+        message.textContent = "Akun anggota kamu sudah aktif. Kamu akan diarahkan ke KOMSI Music Library.";
+        status.textContent = "Berhasil";
+        home.hidden = false;
+        setTimeout(function () { window.location.replace(HOME_URL); }, 2200);
+      } catch (error) {
+        title.textContent = "Konfirmasi belum berhasil";
+        message.textContent = error && error.message ? error.message : "Terjadi kesalahan saat memverifikasi email.";
+        status.textContent = "Silakan coba tautan terbaru atau hubungi admin KOMSI.";
+        home.hidden = false;
+      }
+    })();
+  </script>
+</body>
+</html>
