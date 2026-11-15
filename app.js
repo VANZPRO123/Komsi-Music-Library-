@@ -425,6 +425,22 @@
   function findSongIndex(id) {
     return songs.findIndex(song => String(song.id) === String(id));
   }
+  function getPlaybackQueue() {
+    if (activeView === "playlist") {
+      const list = playlists.find(item => item.id === activePlaylistId);
+      if (!list) return [];
+      return list.songIds.map(id => songs.find(song => String(song.id) === id)).filter(Boolean);
+    }
+    return songs;
+  }
+  function movePlayback(step) {
+    const queue = getPlaybackQueue();
+    if (!queue.length) { toast("Playlist ini belum memiliki lagu."); return; }
+    const currentId = currentSongIndex >= 0 ? String(songs[currentSongIndex]?.id) : "";
+    const position = queue.findIndex(song => String(song.id) === currentId);
+    const nextPosition = position < 0 ? (step > 0 ? 0 : queue.length - 1) : (position + step + queue.length) % queue.length;
+    playSongById(queue[nextPosition].id);
+  }
   function playSongById(id) {
     const index = findSongIndex(id);
     if (index < 0) return;
@@ -683,19 +699,12 @@
       renderSongs();
       $("#librarySection").scrollIntoView({ behavior: "smooth" });
     });
-    $("#prevBtn").addEventListener("click", () => {
-      if (!songs.length) return;
-      const index = currentSongIndex <= 0 ? songs.length - 1 : currentSongIndex - 1;
-      playSongById(songs[index].id);
-    });
-    $("#nextBtn").addEventListener("click", () => {
-      if (!songs.length) return;
-      const index = currentSongIndex < 0 || currentSongIndex >= songs.length - 1 ? 0 : currentSongIndex + 1;
-      playSongById(songs[index].id);
-    });
+    $("#prevBtn").addEventListener("click", () => movePlayback(-1));
+    $("#nextBtn").addEventListener("click", () => movePlayback(1));
     els.playPause.addEventListener("click", () => {
       if (!els.audio.src) {
-        if (songs.length) playSongById(songs[0].id);
+        const queue = getPlaybackQueue();
+        if (queue.length) playSongById(queue[0].id);
         else toast("Belum ada lagu untuk diputar.");
         return;
       }
@@ -735,10 +744,8 @@
       }
     });
     els.audio.addEventListener("ended", () => {
-      if (songs.length > 1) {
-        const index = currentSongIndex >= songs.length - 1 ? 0 : currentSongIndex + 1;
-        playSongById(songs[index].id);
-      }
+      const queue = getPlaybackQueue();
+      if (queue.length > 1) movePlayback(1);
     });
     els.audio.addEventListener("error", () => {
       if (els.audio.src) toast("File audio tidak dapat dibaca. Pastikan format dan URL benar.", "error");
