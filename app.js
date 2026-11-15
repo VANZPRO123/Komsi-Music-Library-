@@ -35,6 +35,8 @@
   let activeGenre = "all";
   let activeView = "discover";
   let favoriteIds = new Set();
+  let playlists = [];
+  let activePlaylistId = null;
   let isBusy = false;
   // Satu sesi pemutaran dihitung sekali; pause/resume tidak menambah statistik.
   let playSessionId = 0;
@@ -255,11 +257,87 @@
   }
 
   function updateActiveNavigation() {
-    const activeId = activeView === "favorites" ? "favoritesNav" : activeView === "all" ? "allSongsNav" : "homeNav";
+    const activeId = activeView === "favorites" ? "favoritesNav" : activeView === "all" ? "allSongsNav" : activeView === "playlist" ? "" : "homeNav";
     ["#homeNav", "#allSongsNav", "#favoritesNav"].forEach(selector => {
       const button = $(selector);
       if (button) button.classList.toggle("active", button.id === activeId);
     });
+    $("#playlistNavList .playlist-nav-item").forEach(button => button.classList.toggle("active", button.dataset.playlistId === activePlaylistId && activeView === "playlist"));
+  }
+
+  function loadPlaylists() {
+    try {
+      const saved = JSON.parse(localStorage.getItem("komsiMusicPlaylists") || "[]");
+      playlists = Array.isArray(saved) ? saved.filter(item => item && typeof item.id === "string" && typeof item.name === "string" && Array.isArray(item.songIds)).map(item => ({ id: item.id, name: item.name.slice(0, 50), songIds: [...new Set(item.songIds.map(String))] })) : [];
+    } catch (error) {
+      console.warn("Playlist lokal tidak dapat dibaca:", error);
+      playlists = [];
+    }
+    renderPlaylistNavigation();
+  }
+
+  function savePlaylists() {
+    try {
+      localStorage.setItem("komsiMusicPlaylists", JSON.stringify(playlists));
+    } catch (error) {
+      toast("Playlist tidak dapat disimpan di perangkat ini.", "error");
+    }
+  }
+
+  function renderPlaylistNavigation() {
+    const container = $("#playlistNavList");
+    if (!container) return;
+    container.innerHTML = playlists.length ? playlists.map(list => `
+      <div class="playlist-nav-row">
+        <button class="playlist-nav-item" data-playlist-id="${escapeHTML(list.id)}" type="button"><span class="playlist-nav-icon">♫</span><span>${escapeHTML(list.name)}</span><small>${list.songIds.length}</small></button>
+        <button class="playlist-delete" data-delete-playlist-id="${escapeHTML(list.id)}" type="button" aria-label="Hapus playlist ${escapeHTML(list.name)}" title="Hapus playlist">×</button>
+      </div>`).join("") : '<p class="playlist-nav-empty">Belum ada playlist</p>';
+    updateActiveNavigation();
+  }
+
+  function createPlaylist() {
+    const name = clean(window.prompt("Nama playlist baru:"));
+    if (!name) return;
+    if (playlists.some(item => item.name.toLocaleLowerCase("id") === name.toLocaleLowerCase("id"))) {
+      toast("Nama playlist tersebut sudah digunakan.", "error");
+      return;
+    }
+    playlists.unshift({ id: `pl-${Date.now()}-${Math.random().toString(36).slice(2,7)}`, name: name.slice(0,50), songIds: [] });
+    savePlaylists();
+    renderPlaylistNavigation();
+    toast("Playlist berhasil dibuat.", "success");
+  }
+
+  function addSongToPlaylist(songId) {
+    if (!playlists.length) {
+      const create = window.confirm("Kamu belum punya playlist. Buat playlist sekarang?");
+      if (!create) return;
+      createPlaylist();
+      if (!playlists.length) return;
+    }
+    const choices = playlists.map((list, index) => `${index + 1}. ${list.name}`).join("\\n");
+    const answer = window.prompt(`Tambahkan lagu ke playlist nomor berapa?\\n\\n${choices}`, "1");
+    if (answer === null) return;
+    const index = Number(answer) - 1;
+    const list = Number.isInteger(index) ? playlists[index] : null;
+    if (!list) { toast("Nomor playlist tidak valid.", "error"); return; }
+    const key = String(songId);
+    if (list.songIds.includes(key)) { toast("Lagu sudah ada di playlist ini."); return; }
+    list.songIds.push(key);
+    savePlaylists();
+    renderPlaylistNavigation();
+    toast(`Lagu ditambahkan ke playlist "${list.name}".`, "success");
+  }
+
+  function deletePlaylist(id) {
+    const list = playlists.find(item => item.id === id);
+    if (!list || !window.confirm(`Hapus playlist "${list.name}"? Lagu aslinya tidak akan dihapus.`)) return;
+    playlists = playlists.filter(item => item.id !== id);
+    if (activePlaylistId === id) { activePlaylistId = null; activeView = "discover"; }
+    savePlaylists();
+    renderPlaylistNavigation();
+    renderSongs();
+    toast("Playlist dihapus.");
   }
 
   function buildGenreChips() {
@@ -276,8 +354,9 @@
     const result = songs.filter(song => {
       const matchesGenre = activeGenre === "all" || clean(song.genre) === activeGenre;
       const matchesView = activeView !== "favorites" || favoriteIds.has(String(song.id));
+      const matchesPlaylist = activeView !== "playlist" || Boolean(playlists.find(list => list.id === activePlaylistId)?.songIds.includes(String(song.id)));
       const haystack = [song.title, song.artist, song.genre, song.album].map(clean).join(" ").toLocaleLowerCase("id");
-      return matchesGenre && matchesView && (!query || haystack.includes(query));
+      return matchesGenre && matchesView && matchesPlaylist && (!query || haystack.includes(query));
     });
     const sort = els.sort.value;
     result.sort((a, b) => {
@@ -306,6 +385,9 @@
       if (activeView === "favorites" && !favoriteIds.size) {
         if (title) title.textContent = "Belum ada lagu favorit";
         if (description) description.textContent = "Tekan ikon hati pada lagu untuk menyimpannya di sini.";
+      } else if (activeView === "playlist") {
+        if (title) title.textContent = "Playlist ini masih kosong";
+        if (description) description.textContent = "Tambahkan lagu menggunakan tombol + Playlist pada kartu lagu.";
       } else {
         if (title) title.textContent = "Lagu tidak ditemukan";
         if (description) description.textContent = "Coba kata kunci atau filter genre yang berbeda.";
@@ -334,6 +416,7 @@
         <p class="song-artist" title="${artist}">${artist}</p>
         <div class="song-bottom"><span class="song-date">${escapeHTML(formatDate(song.created_at))}</span>
         <button class="favorite-song ${favoriteIds.has(String(song.id)) ? "is-favorite" : ""}" data-favorite-id="${escapeHTML(song.id)}" type="button" aria-label="${favoriteIds.has(String(song.id)) ? "Hapus dari" : "Tambah ke"} favorit" aria-pressed="${favoriteIds.has(String(song.id))}">${favoriteIds.has(String(song.id)) ? "♥" : "♡"}</button>
+        <button class="add-playlist-song" data-playlist-song-id="${escapeHTML(song.id)}" type="button" aria-label="Tambahkan ke playlist" title="Tambahkan ke playlist">＋</button>
         ${isAdmin() ? `<button class="delete-song" data-delete-id="${escapeHTML(song.id)}" type="button">Hapus</button>` : ""}</div>
       </article>`;
     }).join("");
@@ -542,6 +625,8 @@
     els.grid.addEventListener("click", event => {
       const favorite = event.target.closest("[data-favorite-id]");
       if (favorite) { toggleFavorite(favorite.dataset.favoriteId); return; }
+      const addPlaylist = event.target.closest("[data-playlist-song-id]");
+      if (addPlaylist) { addSongToPlaylist(addPlaylist.dataset.playlistSongId); return; }
       const play = event.target.closest("[data-play-id]");
       if (play) {
         const id = play.dataset.playId;
@@ -556,6 +641,7 @@
     $("#retryBtn").addEventListener("click", loadSongs);
     $("#clearFiltersBtn").addEventListener("click", () => {
       els.search.value = "";
+      if (activeView === "playlist") { activeView = "discover"; activePlaylistId = null; updateActiveNavigation(); }
       activeGenre = "all";
       els.sort.value = "newest";
       buildGenreChips();
@@ -564,18 +650,35 @@
     $("#exploreBtn").addEventListener("click", () => $("#librarySection").scrollIntoView({ behavior: "smooth" }));
     $("#homeNav").addEventListener("click", () => {
       activeView = "discover";
+      activePlaylistId = null;
       updateActiveNavigation();
       renderSongs();
       window.scrollTo({ top: 0, behavior: "smooth" });
     });
     $("#allSongsNav").addEventListener("click", () => {
       activeView = "all";
+      activePlaylistId = null;
       updateActiveNavigation();
       renderSongs();
       $("#librarySection").scrollIntoView({ behavior: "smooth" });
     });
     $("#favoritesNav").addEventListener("click", () => {
       activeView = "favorites";
+      activePlaylistId = null;
+      updateActiveNavigation();
+      renderSongs();
+      $("#librarySection").scrollIntoView({ behavior: "smooth" });
+    });
+    $("#createPlaylistBtn").addEventListener("click", createPlaylist);
+    $("#playlistNavList").addEventListener("click", event => {
+      const remove = event.target.closest("[data-delete-playlist-id]");
+      if (remove) { deletePlaylist(remove.dataset.deletePlaylistId); return; }
+      const item = event.target.closest("[data-playlist-id]");
+      if (!item) return;
+      activeView = "playlist";
+      activePlaylistId = item.dataset.playlistId;
+      activeGenre = "all";
+      buildGenreChips();
       updateActiveNavigation();
       renderSongs();
       $("#librarySection").scrollIntoView({ behavior: "smooth" });
@@ -653,6 +756,7 @@
   async function init() {
     $("#yearText").textContent = String(new Date().getFullYear());
     loadFavorites();
+    loadPlaylists();
     bindEvents();
     updateActiveNavigation();
     setAdminUI();
