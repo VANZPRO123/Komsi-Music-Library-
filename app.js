@@ -37,6 +37,7 @@
   let favoriteIds = new Set();
   let playlists = [];
   let activePlaylistId = null;
+  let shufflePlaylist = false;
   let isBusy = false;
   // Satu sesi pemutaran dihitung sekali; pause/resume tidak menambah statistik.
   let playSessionId = 0;
@@ -453,6 +454,7 @@
     if (!queue.length) { toast("Playlist ini belum memiliki lagu."); return; }
     const currentId = currentSongIndex >= 0 ? String(songs[currentSongIndex]?.id) : "";
     const position = queue.findIndex(song => String(song.id) === currentId);
+    if (shufflePlaylist && step > 0 && queue.length > 1) { const choices = queue.filter(song => String(song.id) !== currentId); playSongById(choices[Math.floor(Math.random() * choices.length)].id); return; }
     const nextPosition = position < 0 ? (step > 0 ? 0 : queue.length - 1) : (position + step + queue.length) % queue.length;
     playSongById(queue[nextPosition].id);
   }
@@ -714,6 +716,10 @@
       $("#librarySection").scrollIntoView({ behavior: "smooth" });
     });
     $("#createPlaylistBtn").addEventListener("click", createPlaylist);
+    $("#playlistPlayBtn").addEventListener("click", () => playActivePlaylist(false));
+    $("#playlistShuffleBtn").addEventListener("click", () => { shufflePlaylist = !shufflePlaylist; renderPlaylistDetail(); toast(shufflePlaylist ? "Mode acak aktif." : "Mode acak nonaktif."); });
+    $("#playlistRenameBtn").addEventListener("click", renameActivePlaylist);
+    $("#playlistClearBtn").addEventListener("click", clearActivePlaylist);
     $("#playlistNavList").addEventListener("click", event => {
       const remove = event.target.closest("[data-delete-playlist-id]");
       if (remove) { deletePlaylist(remove.dataset.deletePlaylistId); return; }
@@ -989,6 +995,38 @@
     else favoriteIds.add(key);
     renderSongs();
     toast(wasSaved ? "Dihapus dari favorit." : "Ditambahkan ke favorit.", "success");
+  }
+  function renderPlaylistDetail() {
+    const panel = $("#playlistDetail"); if (!panel) return;
+    const list = playlists.find(item => item.id === activePlaylistId);
+    panel.hidden = activeView !== "playlist" || !list; if (!list) return;
+    const tracks = list.songIds.map(id => songs.find(song => String(song.id) === String(id))).filter(Boolean);
+    $("#playlistDetailName").textContent = list.name;
+    $("#playlistDetailMeta").textContent = tracks.length + " lagu · Playlist pribadi";
+    const cover = tracks.find(song => song.cover_url)?.cover_url;
+    $("#playlistDetailCover").innerHTML = cover ? '<img src="' + escapeHTML(cover) + '" alt="Cover playlist">' : "♫";
+    $("#playlistPlayBtn").disabled = !tracks.length;
+    $("#playlistShuffleBtn").classList.toggle("is-active", shufflePlaylist);
+  }
+  async function renameActivePlaylist() {
+    const list = playlists.find(item => item.id === activePlaylistId); if (!list) return;
+    const name = clean(window.prompt("Nama playlist baru:", list.name)).slice(0,50); if (!name || name === list.name) return;
+    if (playlists.some(item => item.id !== list.id && item.name.toLowerCase() === name.toLowerCase())) { toast("Nama playlist sudah digunakan.", "error"); return; }
+    const old = list.name; list.name = name;
+    try { await persistPlaylist(list); renderPlaylistNavigation(); toast("Nama playlist diperbarui.", "success"); } catch (error) { list.name = old; toast("Gagal mengubah nama: " + error.message, "error"); }
+  }
+  async function clearActivePlaylist() {
+    const list = playlists.find(item => item.id === activePlaylistId); if (!list || !list.songIds.length) return;
+    if (!window.confirm("Kosongkan semua lagu dari playlist ini?")) return;
+    const old = list.songIds.slice(); list.songIds = [];
+    try { await persistPlaylist(list); renderPlaylistNavigation(); renderSongs(); toast("Playlist dikosongkan."); } catch (error) { list.songIds = old; toast("Gagal mengosongkan playlist: " + error.message, "error"); }
+  }
+  function playActivePlaylist(shuffle) {
+    const list = playlists.find(item => item.id === activePlaylistId); if (!list) return;
+    const ids = list.songIds.filter(id => songs.some(song => String(song.id) === String(id)));
+    if (!ids.length) { toast("Playlist belum memiliki lagu."); return; }
+    shufflePlaylist = Boolean(shuffle); renderPlaylistDetail();
+    const id = shufflePlaylist ? ids[Math.floor(Math.random() * ids.length)] : ids[0]; playSongById(id);
   }
   async function persistPlaylist(list) {
     const result = await db.from("user_playlists").upsert({
