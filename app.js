@@ -91,7 +91,11 @@
       els.login.hidden = isAdmin();
       els.login.textContent = "Login Admin";
     }
-    if (els.memberAuth) { els.memberAuth.hidden = isAdmin(); els.memberAuth.textContent = currentUser ? "Akun Anggota" : "Login Anggota"; }
+    if (els.memberAuth) {
+      els.memberAuth.hidden = isAdmin();
+      const displayName = currentUser?.user_metadata?.display_name;
+      els.memberAuth.textContent = currentUser ? (displayName ? String(displayName).slice(0, 18) : "Akun Anggota") : "Login Anggota";
+    }
     if (els.logout) { els.logout.hidden = !currentUser; els.logout.textContent = isAdmin() ? "Keluar Admin" : "Keluar"; }
     $$(".delete-song").forEach(button => button.hidden = !isAdmin());
   }
@@ -627,7 +631,11 @@
   function bindEvents() {
     els.login.addEventListener("click", () => loginAdmin());
     els.logout.addEventListener("click", logoutAdmin);
-    els.memberAuth.addEventListener("click", () => currentUser ? toast("Kamu sudah masuk sebagai anggota.") : openMemberAuth());
+    els.memberAuth.addEventListener("click", () => currentUser && !isAdmin() ? openProfile() : openMemberAuth());
+    $("#closeProfileBtn").addEventListener("click", closeProfile);
+    $("#cancelProfileBtn").addEventListener("click", closeProfile);
+    $("#profileModal").addEventListener("click", event => { if (event.target === $("#profileModal")) closeProfile(); });
+    $("#profileForm").addEventListener("submit", handleProfileUpdate);
     $("#closeMemberAuthBtn").addEventListener("click", closeMemberAuth);
     els.memberAuthModal.addEventListener("click", e => { if (e.target === els.memberAuthModal) closeMemberAuth(); });
     $("#memberSignInTab").addEventListener("click", () => setMemberAuthMode(false));
@@ -810,6 +818,51 @@
     }
   }
 
+
+
+  function openProfile() {
+    if (!currentUser || isAdmin()) return;
+    $("#profileName").value = currentUser.user_metadata?.display_name || "";
+    $("#profileEmail").value = currentUser.email || "";
+    $("#profileForm").elements.newPassword.value = "";
+    $("#profileForm").elements.confirmNewPassword.value = "";
+    $("#profileModal").hidden = false;
+    document.body.style.overflow = "hidden";
+    $("#profileName").focus();
+  }
+  function closeProfile() {
+    $("#profileModal").hidden = true;
+    document.body.style.overflow = "";
+  }
+  async function handleProfileUpdate(event) {
+    event.preventDefault();
+    if (!currentUser || isAdmin()) return;
+    const form = event.currentTarget;
+    const name = clean(form.elements.displayName.value);
+    const password = form.elements.newPassword.value;
+    const confirmation = form.elements.confirmNewPassword.value;
+    if (!name) { toast("Nama tampilan tidak boleh kosong.", "error"); return; }
+    if (password && password.length < 6) { toast("Password baru minimal 6 karakter.", "error"); return; }
+    if (password !== confirmation) { toast("Konfirmasi password baru tidak sama.", "error"); return; }
+    const button = $("#saveProfileBtn");
+    button.disabled = true;
+    button.textContent = "Menyimpan...";
+    try {
+      const updates = { data: { ...(currentUser.user_metadata || {}), display_name: name } };
+      if (password) updates.password = password;
+      const { data, error } = await db.auth.updateUser(updates);
+      if (error) throw error;
+      currentUser = data.user || currentUser;
+      setAdminUI();
+      closeProfile();
+      toast(password ? "Profil dan password berhasil diperbarui." : "Nama profil berhasil diperbarui.", "success");
+    } catch (error) {
+      toast("Profil gagal diperbarui: " + error.message, "error");
+    } finally {
+      button.disabled = false;
+      button.textContent = "Simpan perubahan";
+    }
+  }
 
   function openMemberAuth() {
     els.memberAuthModal.hidden = false;
