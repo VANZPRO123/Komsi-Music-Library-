@@ -368,3 +368,5 @@ body{
 .auth-notice{margin-top:18px}
 .member-auth-card{max-width:480px}
 @media(max-width:700px){#memberAuthBtn,#adminLoginBtn{padding:9px 10px;font-size:12px}}
+
+.profile-card{width:min(100%,500px)}.profile-field-spaced{margin-top:15px}.profile-password-heading{display:flex;flex-direction:column;gap:5px;margin:22px 0 13px;padding-top:18px;border-top:1px solid var(--line)}.profile-password-heading strong{font:600 13px 'Space Grotesk',sans-serif}.profile-password-heading small{font-size:10px;color:#92929c}.profile-card input:disabled{color:#92929c;background:#f4f4f6;cursor:not-allowed}
