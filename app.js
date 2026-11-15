@@ -33,6 +33,8 @@
   let currentSongIndex = -1;
   let currentUser = null;
   let activeGenre = "all";
+  let activeView = "discover";
+  let favoriteIds = new Set();
   let isBusy = false;
   // Satu sesi pemutaran dihitung sekali; pause/resume tidak menambah statistik.
   let playSessionId = 0;
@@ -225,6 +227,41 @@
     els.heroMeta.textContent = `${songs.length} lagu dalam koleksi`;
   }
 
+  function loadFavorites() {
+    try {
+      const saved = JSON.parse(localStorage.getItem("komsiMusicFavorites") || "[]");
+      favoriteIds = new Set(Array.isArray(saved) ? saved.map(String) : []);
+    } catch (error) {
+      console.warn("Favorit lokal tidak dapat dibaca:", error);
+      favoriteIds = new Set();
+    }
+  }
+
+  function saveFavorites() {
+    try {
+      localStorage.setItem("komsiMusicFavorites", JSON.stringify([...favoriteIds]));
+    } catch (error) {
+      toast("Favorit tidak dapat disimpan di perangkat ini.", "error");
+    }
+  }
+
+  function toggleFavorite(id) {
+    const key = String(id);
+    if (favoriteIds.has(key)) favoriteIds.delete(key);
+    else favoriteIds.add(key);
+    saveFavorites();
+    renderSongs();
+    toast(favoriteIds.has(key) ? "Ditambahkan ke favorit." : "Dihapus dari favorit.", "success");
+  }
+
+  function updateActiveNavigation() {
+    const activeId = activeView === "favorites" ? "favoritesNav" : activeView === "all" ? "allSongsNav" : "homeNav";
+    ["#homeNav", "#allSongsNav", "#favoritesNav"].forEach(selector => {
+      const button = $(selector);
+      if (button) button.classList.toggle("active", button.id === activeId);
+    });
+  }
+
   function buildGenreChips() {
     const genres = [...new Set(songs.map(song => clean(song.genre)).filter(Boolean))]
       .sort((a, b) => a.localeCompare(b, "id"));
@@ -238,8 +275,9 @@
     const query = clean(els.search.value).toLocaleLowerCase("id");
     const result = songs.filter(song => {
       const matchesGenre = activeGenre === "all" || clean(song.genre) === activeGenre;
+      const matchesView = activeView !== "favorites" || favoriteIds.has(String(song.id));
       const haystack = [song.title, song.artist, song.genre, song.album].map(clean).join(" ").toLocaleLowerCase("id");
-      return matchesGenre && (!query || haystack.includes(query));
+      return matchesGenre && matchesView && (!query || haystack.includes(query));
     });
     const sort = els.sort.value;
     result.sort((a, b) => {
@@ -263,8 +301,21 @@
     if (!filteredSongs.length) {
       els.grid.innerHTML = "";
       showState("noResults");
+      const title = $("#noResultsState strong");
+      const description = $("#noResultsState p");
+      if (activeView === "favorites" && !favoriteIds.size) {
+        if (title) title.textContent = "Belum ada lagu favorit";
+        if (description) description.textContent = "Tekan ikon hati pada lagu untuk menyimpannya di sini.";
+      } else {
+        if (title) title.textContent = "Lagu tidak ditemukan";
+        if (description) description.textContent = "Coba kata kunci atau filter genre yang berbeda.";
+      }
       return;
     }
+    const noResultsTitle = $("#noResultsState strong");
+    const noResultsDescription = $("#noResultsState p");
+    if (noResultsTitle) noResultsTitle.textContent = "Lagu tidak ditemukan";
+    if (noResultsDescription) noResultsDescription.textContent = "Coba kata kunci atau filter genre yang berbeda.";
     showState("none");
     els.grid.innerHTML = filteredSongs.map((song, index) => {
       const title = escapeHTML(song.title || "Tanpa judul");
@@ -282,6 +333,7 @@
         <h3 class="song-title" title="${title}">${title}</h3>
         <p class="song-artist" title="${artist}">${artist}</p>
         <div class="song-bottom"><span class="song-date">${escapeHTML(formatDate(song.created_at))}</span>
+        <button class="favorite-song ${favoriteIds.has(String(song.id)) ? "is-favorite" : ""}" data-favorite-id="${escapeHTML(song.id)}" type="button" aria-label="${favoriteIds.has(String(song.id)) ? "Hapus dari" : "Tambah ke"} favorit" aria-pressed="${favoriteIds.has(String(song.id))}">${favoriteIds.has(String(song.id)) ? "♥" : "♡"}</button>
         ${isAdmin() ? `<button class="delete-song" data-delete-id="${escapeHTML(song.id)}" type="button">Hapus</button>` : ""}</div>
       </article>`;
     }).join("");
@@ -488,6 +540,8 @@
       renderSongs();
     });
     els.grid.addEventListener("click", event => {
+      const favorite = event.target.closest("[data-favorite-id]");
+      if (favorite) { toggleFavorite(favorite.dataset.favoriteId); return; }
       const play = event.target.closest("[data-play-id]");
       if (play) {
         const id = play.dataset.playId;
@@ -508,8 +562,24 @@
       renderSongs();
     });
     $("#exploreBtn").addEventListener("click", () => $("#librarySection").scrollIntoView({ behavior: "smooth" }));
-    $("#homeNav").addEventListener("click", () => window.scrollTo({ top: 0, behavior: "smooth" }));
-    $("#allSongsNav").addEventListener("click", () => $("#librarySection").scrollIntoView({ behavior: "smooth" }));
+    $("#homeNav").addEventListener("click", () => {
+      activeView = "discover";
+      updateActiveNavigation();
+      renderSongs();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+    $("#allSongsNav").addEventListener("click", () => {
+      activeView = "all";
+      updateActiveNavigation();
+      renderSongs();
+      $("#librarySection").scrollIntoView({ behavior: "smooth" });
+    });
+    $("#favoritesNav").addEventListener("click", () => {
+      activeView = "favorites";
+      updateActiveNavigation();
+      renderSongs();
+      $("#librarySection").scrollIntoView({ behavior: "smooth" });
+    });
     $("#prevBtn").addEventListener("click", () => {
       if (!songs.length) return;
       const index = currentSongIndex <= 0 ? songs.length - 1 : currentSongIndex - 1;
@@ -582,7 +652,9 @@
 
   async function init() {
     $("#yearText").textContent = String(new Date().getFullYear());
+    loadFavorites();
     bindEvents();
+    updateActiveNavigation();
     setAdminUI();
     if (!window.supabase || typeof window.supabase.createClient !== "function") {
       showState("error");
