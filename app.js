@@ -734,6 +734,7 @@
       activeGenre = "all";
       buildGenreChips();
       updateActiveNavigation();
+      renderPlaylistDetail();
       renderSongs();
       $("#librarySection").scrollIntoView({ behavior: "smooth" });
     });
