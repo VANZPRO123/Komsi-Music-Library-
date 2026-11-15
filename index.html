@@ -54,6 +54,7 @@
         <div class="top-actions">
           <span class="status-dot" aria-hidden="true"></span>
           <span class="status-label" id="connectionStatus">Menghubungkan</span>
+          <button class="button button-outline" id="memberAuthBtn" type="button">Login Anggota</button>
           <button class="button button-outline" id="adminLoginBtn" type="button">Login Admin</button>
           <button class="button button-primary" id="logoutBtn" type="button" hidden>Keluar</button>
         </div>
@@ -131,6 +132,26 @@
     <audio id="audioElement" preload="metadata"></audio>
   </section>
 
+
+  <div class="modal-backdrop" id="memberAuthModal" hidden>
+    <section class="modal-card member-auth-card" role="dialog" aria-modal="true" aria-labelledby="memberAuthTitle">
+      <div class="modal-header"><div><div class="eyebrow eyebrow-dark">KOMSI MEMBER ACCOUNT</div><h2 id="memberAuthTitle">Akun <span>anggota</span></h2><p>Masuk atau daftar untuk menyimpan favorit dan playlist di semua perangkat.</p></div><button class="modal-close" id="closeMemberAuthBtn" type="button" aria-label="Tutup">×</button></div>
+      <div class="auth-tabs"><button class="auth-tab active" id="memberSignInTab" type="button">Masuk</button><button class="auth-tab" id="memberSignUpTab" type="button">Daftar</button></div>
+      <form id="memberSignInForm" class="member-auth-form">
+        <label class="form-field"><span>Email</span><input name="email" type="email" autocomplete="email" placeholder="nama@email.com" required></label>
+        <label class="form-field"><span>Password</span><input name="password" type="password" autocomplete="current-password" minlength="6" placeholder="Minimal 6 karakter" required></label>
+        <button class="button button-primary auth-submit" type="submit">Masuk ke akun</button>
+      </form>
+      <form id="memberSignUpForm" class="member-auth-form" hidden>
+        <label class="form-field"><span>Nama anggota</span><input name="name" type="text" maxlength="80" autocomplete="name" placeholder="Nama lengkap" required></label>
+        <label class="form-field"><span>Email</span><input name="email" type="email" autocomplete="email" placeholder="nama@email.com" required></label>
+        <label class="form-field"><span>Password</span><input name="password" type="password" autocomplete="new-password" minlength="6" placeholder="Minimal 6 karakter" required></label>
+        <label class="form-field"><span>Ulangi password</span><input name="confirmPassword" type="password" autocomplete="new-password" minlength="6" placeholder="Ulangi password" required></label>
+        <button class="button button-primary auth-submit" type="submit">Buat akun anggota</button>
+      </form>
+      <p class="form-notice auth-notice">Gunakan email aktif untuk verifikasi akun dan pemulihan password.</p>
+    </section>
+  </div>
   <div class="modal-backdrop" id="uploadModal" hidden>
     <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
       <div class="modal-header"><div><div class="eyebrow eyebrow-dark">ADMIN WORKSPACE</div><h2 id="modalTitle">Upload <span>lagu</span></h2><p>Tambahkan musik baru ke koleksi KOMSI.</p></div><button class="modal-close" id="closeModalBtn" type="button" aria-label="Tutup">×</button></div>
