@@ -386,3 +386,25 @@ body{
 .mobile-playlist-list .playlist-delete{opacity:1}
 @media(max-width:850px){.mobile-playlists{display:block}}
 @media(max-width:480px){.mobile-playlists{padding:14px}.mobile-playlists-heading{align-items:flex-start;flex-direction:column}.mobile-playlist-list{grid-template-columns:1fr}}
+
+/* Playlist interaction dialogs */
+.playlist-dialog-backdrop{
+  position:fixed;inset:0;z-index:1005;display:grid;place-items:center;
+  padding:18px;background:rgba(16,13,29,.62);backdrop-filter:blur(8px);
+}
+.playlist-dialog{
+  width:min(100%,420px);padding:25px;border:1px solid rgba(255,255,255,.75);
+  border-radius:20px;background:#fff;box-shadow:0 28px 90px rgba(14,10,35,.28);
+}
+.playlist-dialog-kicker{margin-bottom:9px;color:#7657f6;font-size:10px;font-weight:800;letter-spacing:.14em}
+.playlist-dialog h3{margin:0 0 20px;color:#211d2c;font:600 25px/1.15 "Space Grotesk",sans-serif;letter-spacing:-.04em}
+.playlist-dialog label{display:grid;gap:9px;color:#5f5a6c;font-size:12px;font-weight:700}
+.playlist-dialog-input{width:100%;min-height:46px;padding:11px 13px;border:1px solid #e6e2ef;border-radius:11px;background:#fff;color:#272333;font:inherit;font-size:14px;outline:none}
+.playlist-dialog-input:focus{border-color:#8d76ed;box-shadow:0 0 0 4px rgba(118,87,246,.10)}
+.playlist-dialog-actions{display:flex;justify-content:flex-end;gap:9px;margin-top:22px}
+.playlist-dialog-actions .button{min-height:42px}
+@media(max-width:480px){
+  .playlist-dialog{padding:21px 17px;border-radius:18px}
+  .playlist-dialog-actions{display:grid;grid-template-columns:1fr 1fr}
+  .playlist-dialog-actions .button{justify-content:center}
+}
