@@ -24,7 +24,7 @@
     playerTitle: $("#playerTitle"), playerArtist: $("#playerArtist"),
     playPause: $("#playPauseBtn"), progress: $("#progressRange"),
     currentTime: $("#currentTime"), duration: $("#durationText"),
-    volume: $("#volumeRange"), login: $("#adminLoginBtn"), logout: $("#logoutBtn")
+    volume: $("#volumeRange"), login: $("#adminLoginBtn"), logout: $("#logoutBtn"), memberAuth: $("#memberAuthBtn"), memberAuthModal: $("#memberAuthModal")
   };
 
   let db = null;
@@ -91,7 +91,8 @@
       els.login.hidden = isAdmin();
       els.login.textContent = "Login Admin";
     }
-    if (els.logout) els.logout.hidden = !isAdmin();
+    if (els.memberAuth) { els.memberAuth.hidden = isAdmin(); els.memberAuth.textContent = currentUser ? "Akun Anggota" : "Login Anggota"; }
+    if (els.logout) { els.logout.hidden = !currentUser; els.logout.textContent = isAdmin() ? "Keluar Admin" : "Keluar"; }
     $$(".delete-song").forEach(button => button.hidden = !isAdmin());
   }
 
@@ -626,6 +627,13 @@
   function bindEvents() {
     els.login.addEventListener("click", () => loginAdmin());
     els.logout.addEventListener("click", logoutAdmin);
+    els.memberAuth.addEventListener("click", () => currentUser ? toast("Kamu sudah masuk sebagai anggota.") : openMemberAuth());
+    $("#closeMemberAuthBtn").addEventListener("click", closeMemberAuth);
+    els.memberAuthModal.addEventListener("click", e => { if (e.target === els.memberAuthModal) closeMemberAuth(); });
+    $("#memberSignInTab").addEventListener("click", () => setMemberAuthMode(false));
+    $("#memberSignUpTab").addEventListener("click", () => setMemberAuthMode(true));
+    $("#memberSignInForm").addEventListener("submit", handleMemberSignIn);
+    $("#memberSignUpForm").addEventListener("submit", handleMemberSignUp);
     ["#addSongBtn", "#emptyUploadBtn", "#heroAdminBtn"].forEach(selector => {
       const button = $(selector);
       if (button) button.addEventListener("click", openUploadModal);
@@ -774,44 +782,31 @@
 
   async function init() {
     $("#yearText").textContent = String(new Date().getFullYear());
-    loadFavorites();
-    loadPlaylists();
-    bindEvents();
-    updateActiveNavigation();
-    setAdminUI();
+    bindEvents(); updateActiveNavigation(); setAdminUI();
     if (!window.supabase || typeof window.supabase.createClient !== "function") {
-      showState("error");
-      els.errorMessage.textContent = "Library Supabase JS tidak berhasil dimuat. Periksa koneksi internet.";
-      setConnection("Tidak terhubung", false);
-      return;
+      showState("error"); els.errorMessage.textContent = "Library Supabase JS belum termuat."; setConnection("Tidak terhubung", false); return;
     }
     try {
-      db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-        auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
-      });
+      db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
       const { data, error } = await db.auth.getSession();
       if (error) console.warn("Get session:", error.message);
-      currentUser = data?.session?.user || null;
-      if (currentUser && currentUser.email?.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
-        await db.auth.signOut();
-        currentUser = null;
-      }
-      db.auth.onAuthStateChange((_event, session) => {
-        currentUser = session?.user || null;
-        if (currentUser && currentUser.email?.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
-          currentUser = null;
-          db.auth.signOut().catch(() => {});
-        }
-        setAdminUI();
-        renderSongs();
-      });
+      currentUser = data && data.session ? data.session.user : null;
+      if (currentUser && !isAdmin()) await loadMemberData();
       setAdminUI();
-      await loadSongs();
+      db.auth.onAuthStateChange((event, session) => {
+        currentUser = session ? session.user : null; setAdminUI();
+        if (!currentUser) {
+          favoriteIds = new Set(); playlists = [];
+          if (activeView === "favorites" || activeView === "playlist") { activeView = "discover"; activePlaylistId = null; }
+          renderPlaylistNavigation(); renderSongs();
+        } else if (event === "SIGNED_IN" && !isAdmin()) {
+          loadMemberData().then(renderSongs).catch(err => toast("Sinkronisasi gagal: " + err.message, "error"));
+        }
+      });
+      await loadSongs(); renderSongs();
     } catch (error) {
-      console.error("Initialization error:", error);
-      showState("error");
-      els.errorMessage.textContent = error.message || "Supabase gagal diinisialisasi.";
-      setConnection("Tidak terhubung", false);
+      console.error("Initialization error:", error); showState("error");
+      els.errorMessage.textContent = error.message || "Supabase gagal diinisialisasi."; setConnection("Tidak terhubung", false);
     }
   }
 
