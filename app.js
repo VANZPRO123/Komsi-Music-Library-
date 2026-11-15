@@ -294,11 +294,14 @@
   function renderPlaylistNavigation() {
     const container = $("#playlistNavList");
     if (!container) return;
-    container.innerHTML = playlists.length ? playlists.map(list => `
+    const markup = playlists.length ? playlists.map(list => `
       <div class="playlist-nav-row">
         <button class="playlist-nav-item" data-playlist-id="${escapeHTML(list.id)}" type="button"><span class="playlist-nav-icon">♫</span><span>${escapeHTML(list.name)}</span><small>${list.songIds.length}</small></button>
         <button class="playlist-delete" data-delete-playlist-id="${escapeHTML(list.id)}" type="button" aria-label="Hapus playlist ${escapeHTML(list.name)}" title="Hapus playlist">×</button>
-      </div>`).join("") : '<p class="playlist-nav-empty">Belum ada playlist</p>';
+      </div>`).join("") : '<p class="playlist-nav-empty">Belum ada playlist. Tekan + untuk membuat playlist.</p>';
+    container.innerHTML = markup;
+    const mobileContainer = $("#mobilePlaylistNavList");
+    if (mobileContainer) mobileContainer.innerHTML = markup;
     updateActiveNavigation();
     if (typeof renderPlaylistDetail === "function") renderPlaylistDetail();
   }
@@ -725,7 +728,7 @@
     $("#playlistRepeatBtn").addEventListener("click", () => { repeatPlaylist = !repeatPlaylist; renderPlaylistDetail(); toast(repeatPlaylist ? "Ulangi playlist aktif." : "Ulangi playlist nonaktif."); });
     $("#playlistRenameBtn").addEventListener("click", renameActivePlaylist);
     $("#playlistClearBtn").addEventListener("click", clearActivePlaylist);
-    $("#playlistNavList").addEventListener("click", event => {
+    function handlePlaylistNavigation(event) {
       const remove = event.target.closest("[data-delete-playlist-id]");
       if (remove) { deletePlaylist(remove.dataset.deletePlaylistId); return; }
       const item = event.target.closest("[data-playlist-id]");
@@ -738,7 +741,10 @@
       renderPlaylistDetail();
       renderSongs();
       $("#librarySection").scrollIntoView({ behavior: "smooth" });
-    });
+    }
+    $("#playlistNavList").addEventListener("click", handlePlaylistNavigation);
+    $("#mobilePlaylistNavList")?.addEventListener("click", handlePlaylistNavigation);
+    $("#mobileCreatePlaylistBtn")?.addEventListener("click", createPlaylist);
     $("#prevBtn").addEventListener("click", () => movePlayback(-1));
     $("#nextBtn").addEventListener("click", () => movePlayback(1));
     els.playPause.addEventListener("click", () => {
