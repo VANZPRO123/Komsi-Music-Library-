@@ -722,7 +722,7 @@
       renderSongs();
       $("#librarySection").scrollIntoView({ behavior: "smooth" });
     });
-    $("#createPlaylistBtn").addEventListener("click", createPlaylist);
+    $("#createPlaylistBtn").addEventListener("click", openCreatePlaylistModal);
     $("#playlistPlayBtn").addEventListener("click", () => playActivePlaylist(false));
     $("#playlistShuffleBtn").addEventListener("click", () => { shufflePlaylist = !shufflePlaylist; renderPlaylistDetail(); toast(shufflePlaylist ? "Mode acak aktif." : "Mode acak nonaktif."); });
     $("#playlistRepeatBtn").addEventListener("click", () => { repeatPlaylist = !repeatPlaylist; renderPlaylistDetail(); toast(repeatPlaylist ? "Ulangi playlist aktif." : "Ulangi playlist nonaktif."); });
@@ -744,7 +744,11 @@
     }
     $("#playlistNavList").addEventListener("click", handlePlaylistNavigation);
     $("#mobilePlaylistNavList")?.addEventListener("click", handlePlaylistNavigation);
-    $("#mobileCreatePlaylistBtn")?.addEventListener("click", createPlaylist);
+    $("#mobileCreatePlaylistBtn")?.addEventListener("click", openCreatePlaylistModal);
+    $("#createPlaylistForm")?.addEventListener("submit", createPlaylist);
+    $("#closeCreatePlaylistBtn")?.addEventListener("click", closeCreatePlaylistModal);
+    $("#cancelCreatePlaylistBtn")?.addEventListener("click", closeCreatePlaylistModal);
+    $("#createPlaylistModal")?.addEventListener("click", event => { if (event.target === $("#createPlaylistModal")) closeCreatePlaylistModal(); });
     $("#prevBtn").addEventListener("click", () => movePlayback(-1));
     $("#nextBtn").addEventListener("click", () => movePlayback(1));
     els.playPause.addEventListener("click", () => {
@@ -1052,28 +1056,72 @@
     });
     if (result.error) throw result.error;
   }
-  async function createPlaylist() {
+  function openCreatePlaylistModal() {
     if (!currentUser || isAdmin()) {
       openMemberAuth();
       toast("Masuk sebagai anggota untuk membuat playlist.");
       return;
     }
-    const name = clean(window.prompt("Nama playlist baru:")).slice(0, 50);
-    if (!name) return;
-    if (playlists.some(function(item) { return item.name.toLowerCase() === name.toLowerCase(); })) {
+    const modal = $("#createPlaylistModal");
+    const form = $("#createPlaylistForm");
+    if (!modal || !form) {
+      toast("Formulir playlist belum tersedia. Muat ulang halaman.", "error");
+      return;
+    }
+    form.reset();
+    modal.hidden = false;
+    document.body.style.overflow = "hidden";
+    window.setTimeout(() => $("#newPlaylistName")?.focus(), 80);
+  }
+
+  function closeCreatePlaylistModal() {
+    const modal = $("#createPlaylistModal");
+    if (modal) modal.hidden = true;
+    document.body.style.overflow = "";
+  }
+
+  async function createPlaylist(event) {
+    if (event) event.preventDefault();
+    if (!currentUser || isAdmin() || !db) {
+      closeCreatePlaylistModal();
+      openMemberAuth();
+      toast("Silakan masuk menggunakan akun anggota terlebih dahulu.");
+      return;
+    }
+    const input = $("#newPlaylistName");
+    const button = $("#saveNewPlaylistBtn");
+    const name = clean(input?.value).slice(0, 50);
+    if (!name) {
+      input?.focus();
+      toast("Nama playlist wajib diisi.", "error");
+      return;
+    }
+    if (playlists.some(item => item.name.toLocaleLowerCase("id") === name.toLocaleLowerCase("id"))) {
       toast("Nama playlist sudah digunakan.", "error");
+      input?.focus();
       return;
     }
-    const result = await db.from("user_playlists")
-      .insert({ user_id: currentUser.id, name: name, song_ids: [] })
-      .select("id,name,song_ids").single();
-    if (result.error) {
-      toast("Playlist gagal dibuat: " + result.error.message, "error");
-      return;
+    if (button) { button.disabled = true; button.textContent = "Menyimpan..."; }
+    try {
+      const { data, error } = await db.from("user_playlists")
+        .insert({ user_id: currentUser.id, name, song_ids: [] })
+        .select("id,name,song_ids").single();
+      if (error) throw error;
+      const created = { id: String(data.id), name: data.name, songIds: (data.song_ids || []).map(String) };
+      playlists.unshift(created);
+      activePlaylistId = created.id;
+      activeView = "playlist";
+      closeCreatePlaylistModal();
+      renderPlaylistNavigation();
+      renderSongs();
+      $("#librarySection")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      toast("Playlist berhasil dibuat dan tersimpan.", "success");
+    } catch (error) {
+      console.error("Create playlist failed:", error);
+      toast("Playlist gagal dibuat: " + (error?.message || "Periksa koneksi dan izin database Supabase."), "error");
+    } finally {
+      if (button) { button.disabled = false; button.textContent = "Buat playlist"; }
     }
-    playlists.unshift({ id: String(result.data.id), name: result.data.name, songIds: [] });
-    renderPlaylistNavigation();
-    toast("Playlist berhasil dibuat dan tersimpan.", "success");
   }
   async function addSongToPlaylist(songId) {
     if (!currentUser || isAdmin()) {
