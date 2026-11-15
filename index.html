@@ -152,6 +152,19 @@
       <p class="form-notice auth-notice">Gunakan email aktif untuk verifikasi akun dan pemulihan password.</p>
     </section>
   </div>
+  <div class="modal-backdrop" id="profileModal" hidden>
+    <section class="modal-card profile-card" role="dialog" aria-modal="true" aria-labelledby="profileTitle">
+      <div class="modal-header"><div><div class="eyebrow eyebrow-dark">MEMBER SETTINGS</div><h2 id="profileTitle">Profil <span>anggota</span></h2><p>Perbarui informasi akun KOMSI Music Library.</p></div><button class="modal-close" id="closeProfileBtn" type="button" aria-label="Tutup">×</button></div>
+      <form id="profileForm">
+        <label class="form-field"><span>Nama tampilan</span><input id="profileName" name="displayName" type="text" maxlength="80" autocomplete="name" required></label>
+        <label class="form-field profile-field-spaced"><span>Email akun</span><input id="profileEmail" type="email" readonly disabled></label>
+        <div class="profile-password-heading"><strong>Ganti password</strong><small>Kosongkan jika tidak ingin mengganti password.</small></div>
+        <label class="form-field"><span>Password baru</span><input name="newPassword" type="password" minlength="6" autocomplete="new-password" placeholder="Minimal 6 karakter"></label>
+        <label class="form-field profile-field-spaced"><span>Ulangi password baru</span><input name="confirmNewPassword" type="password" minlength="6" autocomplete="new-password" placeholder="Ulangi password baru"></label>
+        <div class="form-actions"><button class="button button-outline" id="cancelProfileBtn" type="button">Batal</button><button class="button button-primary" id="saveProfileBtn" type="submit">Simpan perubahan</button></div>
+      </form>
+    </section>
+  </div>
   <div class="modal-backdrop" id="uploadModal" hidden>
     <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
       <div class="modal-header"><div><div class="eyebrow eyebrow-dark">ADMIN WORKSPACE</div><h2 id="modalTitle">Upload <span>lagu</span></h2><p>Tambahkan musik baru ke koleksi KOMSI.</p></div><button class="modal-close" id="closeModalBtn" type="button" aria-label="Tutup">×</button></div>
