@@ -376,7 +376,7 @@
       return matchesGenre && matchesView && matchesPlaylist && (!query || haystack.includes(query));
     });
     const sort = els.sort.value;
-    result.sort((a, b) => {
+    if (activeView !== "playlist") result.sort((a, b) => {
       if (sort === "oldest") return new Date(a.created_at || 0) - new Date(b.created_at || 0);
       if (sort === "az") return clean(a.title).localeCompare(clean(b.title), "id");
       if (sort === "za") return clean(b.title).localeCompare(clean(a.title), "id");
@@ -455,6 +455,7 @@
     if (!queue.length) { toast("Playlist ini belum memiliki lagu."); return; }
     const currentId = currentSongIndex >= 0 ? String(songs[currentSongIndex]?.id) : "";
     const position = queue.findIndex(song => String(song.id) === currentId);
+    if (activeView === "playlist" && step > 0 && position === queue.length - 1 && !repeatPlaylist) { toast("Playlist selesai diputar."); return; }
     if (shufflePlaylist && step > 0 && queue.length > 1) { const choices = queue.filter(song => String(song.id) !== currentId); playSongById(choices[Math.floor(Math.random() * choices.length)].id); return; }
     const nextPosition = position < 0 ? (step > 0 ? 0 : queue.length - 1) : (position + step + queue.length) % queue.length;
     playSongById(queue[nextPosition].id);
