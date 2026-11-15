@@ -28,6 +28,7 @@
   };
 
   let db = null;
+  let supabaseReady = null;
   let songs = [];
   let filteredSongs = [];
   let currentSongIndex = -1;
@@ -821,22 +822,35 @@
     if (window.supabase && typeof window.supabase.createClient === "function") return;
     await new Promise((resolve, reject) => {
       const script = document.createElement("script");
-      script.src = "https://unpkg.com/@supabase/supabase-js@2";
+      script.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js";
       script.async = true;
       script.onload = () => window.supabase && typeof window.supabase.createClient === "function"
         ? resolve()
-        : reject(new Error("Library Supabase JS tidak menyediakan createClient."));
-      script.onerror = () => reject(new Error("Gagal memuat Supabase JS dari CDN. Periksa koneksi internet atau pemblokir konten."));
+        : reject(new Error("Library Supabase JS berhasil dimuat tetapi createClient tidak ditemukan."));
+      script.onerror = () => reject(new Error("Gagal memuat Supabase JS. Periksa koneksi internet atau pemblokir konten."));
       document.head.appendChild(script);
     });
   }
 
+  async function getSupabaseClient() {
+    if (db && db.auth) return db;
+    if (supabaseReady) {
+      const client = await supabaseReady;
+      if (client && client.auth) return client;
+    }
+    throw new Error("Koneksi Supabase belum tersedia. Muat ulang halaman dan periksa koneksi internet.");
+  }
+
   async function init() {
     $("#yearText").textContent = String(new Date().getFullYear());
-    bindEvents(); updateActiveNavigation(); setAdminUI();
-    try {
+    supabaseReady = (async () => {
       await ensureSupabaseLibrary();
       db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
+      return db;
+    })();
+    bindEvents(); updateActiveNavigation(); setAdminUI();
+    try {
+      await supabaseReady;
       const { data, error } = await db.auth.getSession();
       if (error) console.warn("Get session:", error.message);
       currentUser = data && data.session ? data.session.user : null;
@@ -931,8 +945,8 @@
     const button = form.querySelector('button[type="submit"]');
     button.disabled = true;
     try {
-      if (!db || !db.auth) throw new Error("Koneksi Supabase belum siap. Muat ulang halaman dan coba lagi.");
-      const result = await db.auth.signInWithPassword({ email: email, password: form.elements.password.value });
+      const client = await getSupabaseClient();
+      const result = await client.auth.signInWithPassword({ email: email, password: form.elements.password.value });
       if (result.error) throw result.error;
       closeMemberAuth();
       form.reset();
@@ -971,8 +985,8 @@
     const button = form.querySelector('button[type="submit"]');
     button.disabled = true;
     try {
-      if (!db || !db.auth) throw new Error("Koneksi Supabase belum siap. Muat ulang halaman dan coba lagi.");
-      const result = await db.auth.signUp({
+      const client = await getSupabaseClient();
+      const result = await client.auth.signUp({
         email: email,
         password: password,
         options: {
