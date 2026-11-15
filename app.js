@@ -300,6 +300,7 @@
         <button class="playlist-delete" data-delete-playlist-id="${escapeHTML(list.id)}" type="button" aria-label="Hapus playlist ${escapeHTML(list.name)}" title="Hapus playlist">×</button>
       </div>`).join("") : '<p class="playlist-nav-empty">Belum ada playlist</p>';
     updateActiveNavigation();
+    if (typeof renderPlaylistDetail === "function") renderPlaylistDetail();
   }
 
   function createPlaylist() {
