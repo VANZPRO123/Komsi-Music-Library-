@@ -130,9 +130,15 @@
       return false;
     }
     currentUser = data.user;
+    try {
+      await loadMemberData();
+    } catch (error) {
+      console.error("Admin playlist sync failed:", error);
+      toast("Login berhasil, tetapi playlist gagal dimuat: " + (error.message || "Kesalahan database"), "error");
+    }
     setAdminUI();
     renderSongs();
-    toast("Login admin berhasil. Kamu bisa mengunggah lagu.", "success");
+    toast("Login admin berhasil. Kamu bisa mengunggah lagu dan mengelola playlist.", "success");
     return true;
   }
 
@@ -822,7 +828,7 @@
       const { data, error } = await db.auth.getSession();
       if (error) console.warn("Get session:", error.message);
       currentUser = data && data.session ? data.session.user : null;
-      if (currentUser && !isAdmin()) await loadMemberData();
+      if (currentUser) await loadMemberData();
       setAdminUI();
       db.auth.onAuthStateChange((event, session) => {
         currentUser = session ? session.user : null; setAdminUI();
@@ -830,7 +836,7 @@
           favoriteIds = new Set(); playlists = [];
           if (activeView === "favorites" || activeView === "playlist") { activeView = "discover"; activePlaylistId = null; }
           renderPlaylistNavigation(); renderSongs();
-        } else if (event === "SIGNED_IN" && !isAdmin()) {
+        } else if (event === "SIGNED_IN") {
           loadMemberData().then(renderSongs).catch(err => toast("Sinkronisasi gagal: " + err.message, "error"));
         }
       });
@@ -979,22 +985,27 @@
     }
   }
   async function loadMemberData() {
-    if (!currentUser || isAdmin()) {
+    if (!currentUser || !db) {
       favoriteIds = new Set();
       playlists = [];
       renderPlaylistNavigation();
       return;
     }
-    const results = await Promise.all([
-      db.from("user_favorites").select("song_id").eq("user_id", currentUser.id),
-      db.from("user_playlists").select("id,name,song_ids").eq("user_id", currentUser.id).order("updated_at", { ascending: false })
-    ]);
-    if (results[0].error) throw results[0].error;
-    if (results[1].error) throw results[1].error;
-    favoriteIds = new Set((results[0].data || []).map(function(row) { return String(row.song_id); }));
-    playlists = (results[1].data || []).map(function(row) {
+    const playlistResult = await db.from("user_playlists")
+      .select("id,name,song_ids")
+      .eq("user_id", currentUser.id)
+      .order("updated_at", { ascending: false });
+    if (playlistResult.error) throw playlistResult.error;
+    playlists = (playlistResult.data || []).map(function(row) {
       return { id: String(row.id), name: row.name, songIds: (row.song_ids || []).map(String) };
     });
+    if (isAdmin()) {
+      favoriteIds = new Set();
+    } else {
+      const favoriteResult = await db.from("user_favorites").select("song_id").eq("user_id", currentUser.id);
+      if (favoriteResult.error) throw favoriteResult.error;
+      favoriteIds = new Set((favoriteResult.data || []).map(function(row) { return String(row.song_id); }));
+    }
     renderPlaylistNavigation();
   }
   async function toggleFavorite(id) {
@@ -1065,11 +1076,7 @@
     if (!currentUser) {
       pendingCreatePlaylist = true;
       openMemberAuth();
-      toast("Masuk sebagai anggota untuk membuat playlist.");
-      return;
-    }
-    if (isAdmin()) {
-      toast("Playlist pribadi hanya tersedia untuk akun anggota. Keluar dari akun admin lalu masuk sebagai anggota.", "error");
+      toast("Masuk ke akun untuk membuat playlist.");
       return;
     }
     const modal = $("#createPlaylistModal");
@@ -1092,10 +1099,10 @@
 
   async function createPlaylist(event) {
     if (event) event.preventDefault();
-    if (!currentUser || isAdmin() || !db) {
+    if (!currentUser || !db) {
       closeCreatePlaylistModal();
       openMemberAuth();
-      toast("Silakan masuk menggunakan akun anggota terlebih dahulu.");
+      toast("Silakan masuk ke akun terlebih dahulu.");
       return;
     }
     const input = $("#newPlaylistName");
@@ -1155,9 +1162,9 @@
   }
 
   async function addSongToPlaylist(songId) {
-    if (!currentUser || isAdmin()) {
+    if (!currentUser) {
       openMemberAuth();
-      toast("Login sebagai anggota diperlukan untuk menambahkan lagu.");
+      toast("Login diperlukan untuk menambahkan lagu ke playlist.");
       return;
     }
     if (!playlists.length) {
@@ -1199,7 +1206,7 @@
   }
   async function deletePlaylist(id) {
     const list = playlists.find(item => item.id === id);
-    if (!list || !currentUser || isAdmin()) return;
+    if (!list || !currentUser) return;
     if (!window.confirm("Hapus playlist " + list.name + "? Lagu aslinya tetap aman.")) return;
     try {
       const { error } = await db.from("user_playlists").delete().eq("id", id).eq("user_id", currentUser.id);
