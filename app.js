@@ -329,6 +329,16 @@
     toast(`Lagu ditambahkan ke playlist "${list.name}".`, "success");
   }
 
+  function removeSongFromPlaylist(songId) {
+    const list = playlists.find(item => item.id === activePlaylistId);
+    if (!list) return;
+    list.songIds = list.songIds.filter(id => id !== String(songId));
+    savePlaylists();
+    renderPlaylistNavigation();
+    renderSongs();
+    toast("Lagu dihapus dari playlist.");
+  }
+
   function deletePlaylist(id) {
     const list = playlists.find(item => item.id === id);
     if (!list || !window.confirm(`Hapus playlist "${list.name}"? Lagu aslinya tidak akan dihapus.`)) return;
@@ -416,7 +426,7 @@
         <p class="song-artist" title="${artist}">${artist}</p>
         <div class="song-bottom"><span class="song-date">${escapeHTML(formatDate(song.created_at))}</span>
         <button class="favorite-song ${favoriteIds.has(String(song.id)) ? "is-favorite" : ""}" data-favorite-id="${escapeHTML(song.id)}" type="button" aria-label="${favoriteIds.has(String(song.id)) ? "Hapus dari" : "Tambah ke"} favorit" aria-pressed="${favoriteIds.has(String(song.id))}">${favoriteIds.has(String(song.id)) ? "♥" : "♡"}</button>
-        <button class="add-playlist-song" data-playlist-song-id="${escapeHTML(song.id)}" type="button" aria-label="Tambahkan ke playlist" title="Tambahkan ke playlist">＋</button>
+        ${activeView === "playlist" ? `<button class="add-playlist-song remove-playlist-song" data-remove-playlist-song-id="${escapeHTML(song.id)}" type="button" aria-label="Hapus dari playlist" title="Hapus dari playlist">−</button>` : `<button class="add-playlist-song" data-playlist-song-id="${escapeHTML(song.id)}" type="button" aria-label="Tambahkan ke playlist" title="Tambahkan ke playlist">＋</button>`}
         ${isAdmin() ? `<button class="delete-song" data-delete-id="${escapeHTML(song.id)}" type="button">Hapus</button>` : ""}</div>
       </article>`;
     }).join("");
@@ -643,6 +653,8 @@
       if (favorite) { toggleFavorite(favorite.dataset.favoriteId); return; }
       const addPlaylist = event.target.closest("[data-playlist-song-id]");
       if (addPlaylist) { addSongToPlaylist(addPlaylist.dataset.playlistSongId); return; }
+      const removePlaylist = event.target.closest("[data-remove-playlist-song-id]");
+      if (removePlaylist) { removeSongFromPlaylist(removePlaylist.dataset.removePlaylistSongId); return; }
       const play = event.target.closest("[data-play-id]");
       if (play) {
         const id = play.dataset.playId;
