@@ -315,8 +315,8 @@
       createPlaylist();
       if (!playlists.length) return;
     }
-    const choices = playlists.map((list, index) => `${index + 1}. ${list.name}`).join("\\n");
-    const answer = window.prompt(`Tambahkan lagu ke playlist nomor berapa?\\n\\n${choices}`, "1");
+    const choices = playlists.map((list, index) => `${index + 1}. ${list.name}`).join("\n");
+    const answer = window.prompt(`Tambahkan lagu ke playlist nomor berapa?\n\n${choices}`, "1");
     if (answer === null) return;
     const index = Number(answer) - 1;
     const list = Number.isInteger(index) ? playlists[index] : null;
