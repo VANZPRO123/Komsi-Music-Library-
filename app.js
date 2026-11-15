@@ -262,7 +262,7 @@
       const button = $(selector);
       if (button) button.classList.toggle("active", button.id === activeId);
     });
-    $("#playlistNavList .playlist-nav-item").forEach(button => button.classList.toggle("active", button.dataset.playlistId === activePlaylistId && activeView === "playlist"));
+    $$("#playlistNavList .playlist-nav-item").forEach(button => button.classList.toggle("active", button.dataset.playlistId === activePlaylistId && activeView === "playlist"));
   }
 
   function loadPlaylists() {
