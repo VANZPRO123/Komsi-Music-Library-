@@ -38,6 +38,7 @@
   let playlists = [];
   let activePlaylistId = null;
   let shufflePlaylist = false;
+  let repeatPlaylist = false;
   let isBusy = false;
   // Satu sesi pemutaran dihitung sekali; pause/resume tidak menambah statistik.
   let playSessionId = 0;
@@ -705,6 +706,7 @@
       activeView = "all";
       activePlaylistId = null;
       updateActiveNavigation();
+      renderPlaylistDetail();
       renderSongs();
       $("#librarySection").scrollIntoView({ behavior: "smooth" });
     });
@@ -718,6 +720,7 @@
     $("#createPlaylistBtn").addEventListener("click", createPlaylist);
     $("#playlistPlayBtn").addEventListener("click", () => playActivePlaylist(false));
     $("#playlistShuffleBtn").addEventListener("click", () => { shufflePlaylist = !shufflePlaylist; renderPlaylistDetail(); toast(shufflePlaylist ? "Mode acak aktif." : "Mode acak nonaktif."); });
+    $("#playlistRepeatBtn").addEventListener("click", () => { repeatPlaylist = !repeatPlaylist; renderPlaylistDetail(); toast(repeatPlaylist ? "Ulangi playlist aktif." : "Ulangi playlist nonaktif."); });
     $("#playlistRenameBtn").addEventListener("click", renameActivePlaylist);
     $("#playlistClearBtn").addEventListener("click", clearActivePlaylist);
     $("#playlistNavList").addEventListener("click", event => {
@@ -779,7 +782,8 @@
     });
     els.audio.addEventListener("ended", () => {
       const queue = getPlaybackQueue();
-      if (queue.length > 1) movePlayback(1);
+      if (activeView === "playlist" && repeatPlaylist && queue.length === 1) playSongById(queue[0].id);
+      else if (queue.length > 1) movePlayback(1);
     });
     els.audio.addEventListener("error", () => {
       if (els.audio.src) toast("File audio tidak dapat dibaca. Pastikan format dan URL benar.", "error");
@@ -1007,6 +1011,7 @@
     $("#playlistDetailCover").innerHTML = cover ? '<img src="' + escapeHTML(cover) + '" alt="Cover playlist">' : "♫";
     $("#playlistPlayBtn").disabled = !tracks.length;
     $("#playlistShuffleBtn").classList.toggle("is-active", shufflePlaylist);
+    $("#playlistRepeatBtn").classList.toggle("is-active", repeatPlaylist);
   }
   async function renameActivePlaylist() {
     const list = playlists.find(item => item.id === activePlaylistId); if (!list) return;
