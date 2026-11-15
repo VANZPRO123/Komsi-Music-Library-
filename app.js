@@ -142,7 +142,7 @@
     setAdminUI();
     renderSongs();
     closeUploadModal();
-    toast("Kamu sudah keluar dari akun admin.");
+    toast("Kamu sudah keluar dari akun.");
   }
 
   function openUploadModal() {
