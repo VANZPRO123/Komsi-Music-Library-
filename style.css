@@ -372,3 +372,17 @@ body{
 .profile-card{width:min(100%,500px)}.profile-field-spaced{margin-top:15px}.profile-password-heading{display:flex;flex-direction:column;gap:5px;margin:22px 0 13px;padding-top:18px;border-top:1px solid var(--line)}.profile-password-heading strong{font:600 13px 'Space Grotesk',sans-serif}.profile-password-heading small{font-size:10px;color:#92929c}.profile-card input:disabled{color:#92929c;background:#f4f4f6;cursor:not-allowed}
 
 .playlist-detail{display:flex;align-items:center;gap:22px;padding:23px;margin:0 0 27px;border:1px solid #e8e5f4;border-radius:22px;background:linear-gradient(120deg,#f1edff,#fff 72%);box-shadow:0 12px 35px rgba(44,32,91,.06)}.playlist-detail[hidden]{display:none}.playlist-detail-cover{width:145px;height:145px;flex:0 0 145px;border-radius:18px;overflow:hidden;display:grid;place-items:center;color:#fff;font:600 54px 'Space Grotesk',sans-serif;background:linear-gradient(145deg,#9278ff,#4931a6)}.playlist-detail-cover img{width:100%;height:100%;object-fit:cover}.playlist-detail-copy{min-width:0;flex:1}.playlist-detail-copy h2{font:600 clamp(26px,4vw,37px)/1.1 'Space Grotesk',sans-serif;letter-spacing:-.05em;margin:8px 0}.playlist-detail-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}.playlist-detail-actions .button{font-size:10px;padding:10px 13px}.playlist-detail-actions .is-active{border-color:#7657f6;background:#f1edff;color:#6343e5}.playlist-detail-actions button:disabled{opacity:.45;cursor:not-allowed}@media(max-width:600px){.playlist-detail{align-items:flex-start;gap:13px;padding:14px}.playlist-detail-cover{width:88px;height:88px;flex-basis:88px;font-size:35px}.playlist-detail-copy h2{font-size:23px}.playlist-detail-actions{gap:6px;margin-top:11px}.playlist-detail-actions .button{font-size:9px;padding:8px 9px}}
+
+/* Mobile playlist access */
+.mobile-playlists{display:none;margin:0 0 28px;padding:19px;border:1px solid #e9e5f3;border-radius:18px;background:#fff;box-shadow:0 8px 25px rgba(25,20,45,.04)}
+.mobile-playlists-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:13px}
+.mobile-playlists-heading h2{margin:5px 0 3px;font:600 22px "Space Grotesk",sans-serif;letter-spacing:-.04em}
+.mobile-playlists-heading h2 span{color:var(--purple)}
+.mobile-playlists-heading p{margin:0;color:#898593;font-size:11px}
+.mobile-playlists-heading>button{flex:0 0 auto;border:0;border-radius:10px;padding:10px 12px;background:#7657f6;color:#fff;font-size:11px;font-weight:700}
+.mobile-playlist-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+.mobile-playlist-list .playlist-nav-row{padding:3px;border:1px solid #eeeaf5;border-radius:12px;background:#fcfbff}
+.mobile-playlist-list .playlist-nav-item{padding:8px 5px}
+.mobile-playlist-list .playlist-delete{opacity:1}
+@media(max-width:850px){.mobile-playlists{display:block}}
+@media(max-width:480px){.mobile-playlists{padding:14px}.mobile-playlists-heading{align-items:flex-start;flex-direction:column}.mobile-playlist-list{grid-template-columns:1fr}}
